@@ -1,175 +1,117 @@
-import { PrismaService } from '@/prisma.service'
-import { QUEUE_LIST } from '@/shared/constant'
-import { JWTService } from '@/shared/jwt.service'
-import { InjectQueue } from '@nestjs/bullmq'
-import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager'
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common'
-import bcrypt from 'bcryptjs'
-import { Queue } from 'bullmq'
-import { DateTime } from 'luxon'
-import { CreateUserDto, UserDto } from './dto/user.dto'
+import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+import * as bcrypt from 'bcryptjs'
+import { JWTService } from '../shared/jwt.service'
+import { PrismaService } from '@/shared/prisma.service'
+import { AuthResponseDto } from './dto/auth.dto'
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JWTService,
-    @Inject(CACHE_MANAGER) private cache: Cache,
-    @InjectQueue(QUEUE_LIST.AUTH) private queue: Queue,
+    private config: ConfigService,
   ) {}
 
-  async login({ email, password }: UserDto) {
-    const failedjail = await this.getJail(email)
-
-    if (failedjail?.expired > DateTime.now().second) {
-      throw new BadRequestException(
-        'Your account has been locked, please try again later',
-      )
-    }
-
-    if (failedjail?.retry > 5) {
-      throw new BadRequestException(
-        'Your account has been locked, please reset your password',
-      )
-    }
-
-    const user = await this.prisma.user.findUnique({ where: { email } })
-    if (!user) throw new NotFoundException("User's email does not exist")
-
-    const isMatching = await bcrypt.compare(password, user.password)
-    if (!isMatching) {
-      await this.setjail(email, failedjail)
-      throw new UnauthorizedException('Wrong credentials')
-    }
-
-    await this.removeJail(email)
-    const { access_token, refresh_token } = this.jwt.genToken({
-      userId: user.id,
-    })
-
-    return { access_token, refresh_token }
-  }
-
-  async register(userDto: CreateUserDto) {
+  async login(email: string, password: string): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({
-      where: { email: userDto.email },
-    })
-    if (user) throw new BadRequestException("email's user already existed")
-
-    const token = this.jwt.emailToken(userDto)
-    await this.queue.add('SEND_VERIFY_EMAIL', { ...userDto, token })
-  }
-
-  async googleAuth(user: CreateUserDto) {
-    const existedUser = await this.prisma.user.findUnique({
-      where: { email: user.email },
-    })
-    if (!existedUser) return this.createAccount(user)
-
-    const { access_token, refresh_token } = this.jwt.genToken({
-      userId: existedUser.id,
+      where: { email },
     })
 
-    return { access_token, refresh_token }
-  }
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials')
+    }
 
-  async verifyEmail(token: string) {
-    const {
-      email,
-      password,
-      name = '',
-    } = await this.jwt.verifyEmailToken(token)
+    const isPasswordValid = await bcrypt.compare(password, user.password)
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials')
+    }
 
-    const existedUser = await this.prisma.user.findUnique({ where: { email } })
-    if (existedUser) return { access_token: '', refresh_token: '' }
-
-    const { access_token, refresh_token } = await this.createAccount({
-      email,
-      name,
-      password,
-    })
+    const tokens = this.jwt.genToken({ userId: user.id })
 
     return {
-      access_token,
-      refresh_token,
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
     }
   }
 
-  async createAccount(userDto: CreateUserDto) {
-    const saltRounds = 10
-
-    const existedUser = await this.prisma.user.findUnique({
-      where: { email: userDto.email },
+  async register(data: {
+    email: string
+    password: string
+    name?: string
+  }): Promise<AuthResponseDto> {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: data.email },
     })
-    if (existedUser)
-      throw new BadRequestException("email's user already existed")
 
-    const hash: string = await bcrypt.hash(userDto.password, saltRounds)
+    if (existingUser) {
+      throw new UnauthorizedException('User already exists')
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 10)
 
     const user = await this.prisma.user.create({
       data: {
-        name: userDto.name,
-        email: userDto.email,
-        password: hash,
+        email: data.email,
+        password: hashedPassword,
+        name: data.name || null,
       },
     })
 
-    const { access_token, refresh_token } = this.jwt.genToken({
-      userId: user.id,
-    })
+    const tokens = this.jwt.genToken({ userId: user.id })
 
-    return { access_token, refresh_token }
-  }
-
-  async getJail(email: string) {
-    const failedjail: null | JailUser = await this.cache.get(
-      `jail-user-${email}`,
-    )
-    return failedjail
-  }
-
-  async removeJail(email: string) {
-    await this.cache.del(`jail-user-${email}`)
-  }
-
-  async setjail(email: string, failedjail: null | JailUser) {
-    const time = Number(failedjail?.retry ?? 0) + 1
-    const lockTime = this.lockTime(time)
-    const expired = DateTime.now().plus({ minutes: lockTime }).toSeconds()
-
-    await this.cache.set(
-      `jail-user-${email}`,
-      {
-        retry: time,
-        lock: `${lockTime} mins`,
-        expired,
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
       },
-      24 * 60 * 60 * 1000,
-    )
-  }
-
-  lockTime(time: number): number {
-    switch (time) {
-      case 1:
-        return 0
-      case 2:
-        return 0
-      case 3:
-        return 0
-      case 4:
-        return 5
-      case 5:
-        return 15
-      default:
-        return 60
     }
   }
-}
 
-type JailUser = { retry: number; lock: string; expired: number }
+  async googleAuth(profile: {
+    email: string
+    name: string
+    password: string
+  }): Promise<AuthResponseDto> {
+    // Check if user exists
+    let user = await this.prisma.user.findUnique({
+      where: { email: profile.email },
+    })
+
+    // Create user if doesn't exist
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: profile.email,
+          password: profile.password, // This is the provider-id format
+          name: profile.name,
+        },
+      })
+    }
+
+    const tokens = this.jwt.genToken({ userId: user.id })
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+    }
+  }
+
+  async refreshToken(refreshToken: string): Promise<{ access_token: string }> {
+    const newAccessToken = await this.jwt.refreshToken(refreshToken)
+    if (!newAccessToken) {
+      throw new UnauthorizedException('Invalid refresh token')
+    }
+    return { access_token: newAccessToken }
+  }
+}

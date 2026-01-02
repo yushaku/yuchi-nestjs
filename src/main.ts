@@ -12,7 +12,10 @@ import { AppModule } from './app.module'
 
 async function bootstrap() {
   // fastify
-  const adapter = new FastifyAdapter({ logger: false })
+  const adapter = new FastifyAdapter({
+    logger: false,
+    trustProxy: true,
+  })
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     adapter,
@@ -24,6 +27,31 @@ async function bootstrap() {
   // https://docs.nestjs.com/techniques/cookies
   await app.register(fastifyCookie as any, {
     secret: config.get('COOKIE_SECRET'),
+  })
+
+  // Passport compatibility with Fastify
+  // Add Express-compatible methods to Fastify response for Passport OAuth2
+  const instance = app.getHttpAdapter().getInstance()
+  instance.addHook('onRequest', (request: any, reply: any, done: any) => {
+    // Add Express-compatible setHeader method for Passport OAuth2
+    if (!reply.setHeader) {
+      reply.setHeader = function (name: string, value: string) {
+        reply.header(name, value)
+        return this
+      }
+    }
+    // Add Express-compatible end method for Passport OAuth2
+    if (!reply.end) {
+      reply.end = function (chunk?: any, encoding?: any) {
+        if (chunk) {
+          reply.send(chunk)
+        } else {
+          reply.send()
+        }
+        return this
+      }
+    }
+    done()
   })
 
   app.enableCors({
