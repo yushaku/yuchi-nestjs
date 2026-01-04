@@ -1,8 +1,28 @@
 import { JwtDecoded, JwtUser } from '@/shared/decorators'
 import { JwtAuthGuard } from '@/shared/guard/auth.guard'
-import { Controller, Get, UseGuards } from '@nestjs/common'
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
+import { AdminGuard } from '@/shared/guard'
+import {
+  Controller,
+  Get,
+  Put,
+  Param,
+  Query,
+  Body,
+  UseGuards,
+} from '@nestjs/common'
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger'
 import { UserService } from './user.service'
+import {
+  SearchUsersDto,
+  UpdateUserRoleDto,
+  UsersListResponseDto,
+  UserResponseDto,
+} from './dto/user.dto'
 
 @ApiBearerAuth()
 @Controller('users')
@@ -12,7 +32,24 @@ export class UserController {
 
   @Get('info')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current user info' })
   info(@JwtUser() { userId }: JwtDecoded) {
     return this.userService.userInfo(userId)
+  }
+
+  @Get()
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Search and list users (Admin only)' })
+  @ApiResponse({ type: UsersListResponseDto })
+  searchUsers(@Query() query: SearchUsersDto) {
+    return this.userService.searchUsers(query)
+  }
+
+  @Put(':id/role')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Update user role (Admin only)' })
+  @ApiResponse({ type: UserResponseDto })
+  updateUserRole(@Param('id') userId: string, @Body() dto: UpdateUserRoleDto) {
+    return this.userService.updateUserRole(userId, dto)
   }
 }
