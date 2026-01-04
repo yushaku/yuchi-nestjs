@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 
 import { PrismaService } from '@/shared/prisma.service'
 
@@ -9,7 +9,15 @@ export class UserService {
   async userInfo(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
     })
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
     return user
   }
 }

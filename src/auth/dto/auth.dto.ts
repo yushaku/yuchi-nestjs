@@ -1,5 +1,6 @@
+import { createZodDto } from 'nestjs-zod'
+import { z } from 'zod'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsEmail, IsEnum, IsOptional, IsString } from 'class-validator'
 
 export enum Platform {
   WEB = 'web',
@@ -7,19 +8,23 @@ export enum Platform {
   ANDROID = 'android',
 }
 
-export class GoogleAuthDto {
+const PlatformSchema = z.enum(Platform)
+
+export const GoogleAuthSchema = z.object({
+  platform: PlatformSchema,
+  deepLinkScheme: z.string().optional(),
+})
+
+export class GoogleAuthDto extends createZodDto(GoogleAuthSchema) {
   @ApiProperty({
     enum: Platform,
     description: 'Platform type: web, ios, or android',
   })
-  @IsEnum(Platform)
   platform: Platform
 
   @ApiPropertyOptional({
     description: 'Mobile app deep link scheme (e.g., yuchiapp://)',
   })
-  @IsString()
-  @IsOptional()
   deepLinkScheme?: string
 }
 
@@ -38,27 +43,32 @@ export class AuthResponseDto {
   }
 }
 
-export class LoginDto {
+export const LoginSchema = z.object({
+  email: z.email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
+})
+
+export class LoginDto extends createZodDto(LoginSchema) {
   @ApiProperty({ description: 'User email' })
-  @IsEmail()
   email: string
 
   @ApiProperty({ description: 'User password' })
-  @IsString()
   password: string
 }
 
-export class RegisterDto {
+export const RegisterSchema = z.object({
+  email: z.email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
+  name: z.string().optional(),
+})
+
+export class RegisterDto extends createZodDto(RegisterSchema) {
   @ApiProperty({ description: 'User email' })
-  @IsEmail()
   email: string
 
   @ApiProperty({ description: 'User password' })
-  @IsString()
   password: string
 
   @ApiProperty({ description: 'User name', required: false })
-  @IsString()
-  @IsOptional()
   name?: string
 }

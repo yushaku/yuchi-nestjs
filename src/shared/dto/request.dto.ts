@@ -1,20 +1,33 @@
+import { createZodDto } from 'nestjs-zod'
+import { z } from 'zod'
 import { ApiProperty } from '@nestjs/swagger'
-import { Type } from 'class-transformer'
-import { IsInt, IsOptional, Min } from 'class-validator'
 
-export class PaginationDto {
+export const PaginationSchema = z.object({
+  page: z
+    .union([z.string(), z.number()])
+    .optional()
+    .default('1')
+    .transform((val) => {
+      const num = typeof val === 'string' ? parseInt(val, 10) : val
+      return isNaN(num) ? 1 : num
+    })
+    .pipe(z.number().int().min(1)),
+  perPage: z
+    .union([z.string(), z.number()])
+    .optional()
+    .default('20')
+    .transform((val) => {
+      const num = typeof val === 'string' ? parseInt(val, 10) : val
+      return isNaN(num) ? 20 : num
+    })
+    .pipe(z.number().int().min(1)),
+})
+
+export class PaginationDto extends createZodDto(PaginationSchema) {
   @ApiProperty({ default: 1, required: false })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @IsOptional()
   page = 1
 
   @ApiProperty({ default: 20, required: false })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @IsOptional()
   perPage = 20
 
   get skip() {

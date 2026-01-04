@@ -1,7 +1,7 @@
 import fastifyCookie from '@fastify/cookie'
-import { ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { NestFactory } from '@nestjs/core'
+import { ZodValidationPipe } from 'nestjs-zod'
 import {
   FastifyAdapter,
   NestFastifyApplication,
@@ -60,14 +60,8 @@ async function bootstrap() {
     exposedHeaders: ['set-cookie'],
   })
 
-  // Auto-validation
-  // https://docs.nestjs.com/techniques/validation#stripping-properties
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      stopAtFirstError: true,
-    }),
-  )
+  // Auto-validation with Zod
+  app.useGlobalPipes(new ZodValidationPipe())
 
   // Swagger API Document
   const swaggerConfig = new DocumentBuilder()
