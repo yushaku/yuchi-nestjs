@@ -8,6 +8,7 @@ import { AppController } from './app.controller'
 import { AuthModule } from './auth/auth.module'
 import { ShareModule } from './shared/share.module'
 import { UserModule } from './user/user.module'
+import { LearningModule } from './learning/learning.module'
 
 import Redis from 'ioredis'
 import Joi from 'joi'
@@ -53,6 +54,7 @@ import Joi from 'joi'
     UserModule,
     AuthModule,
     ShareModule,
+    LearningModule,
   ],
   controllers: [AppController],
 })

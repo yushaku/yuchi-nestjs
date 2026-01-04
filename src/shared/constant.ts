@@ -65,3 +65,33 @@ export const HttpCodeMessages = {
   507: 'Insufficient Storage',
   508: 'Loop Detected',
 }
+
+// ============================================
+// TOPIK Level Constants
+// ============================================
+
+export enum TOPIK_LEVEL {
+  BEGINNER = 1,
+  INTERMEDIATE = 2,
+  ADVANCED = 3,
+}
+
+export const TOPIK_LEVEL_INFO = {
+  [TOPIK_LEVEL.BEGINNER]: {
+    level: TOPIK_LEVEL.BEGINNER,
+    name: 'TOPIK sơ cấp',
+    description: 'Sơ cấp (Beginner)',
+  },
+  [TOPIK_LEVEL.INTERMEDIATE]: {
+    level: TOPIK_LEVEL.INTERMEDIATE,
+    name: 'TOPIK trung cấp',
+    description: 'Trung cấp (Intermediate)',
+  },
+  [TOPIK_LEVEL.ADVANCED]: {
+    level: TOPIK_LEVEL.ADVANCED,
+    name: 'TOPIK cao cấp',
+    description: 'Cao cấp (Advanced)',
+  },
+} as const
+
+export const TOPIK_LEVELS = Object.values(TOPIK_LEVEL_INFO)
