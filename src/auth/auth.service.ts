@@ -27,7 +27,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials')
     }
 
-    const tokens = this.jwt.genToken({ userId: user.id })
+    const tokens = this.jwt.genToken({ userId: user.id, role: user.role })
 
     return {
       ...tokens,
@@ -62,7 +62,7 @@ export class AuthService {
       },
     })
 
-    const tokens = this.jwt.genToken({ userId: user.id })
+    const tokens = this.jwt.genToken({ userId: user.id, role: user.role })
 
     return {
       ...tokens,
@@ -95,7 +95,7 @@ export class AuthService {
       })
     }
 
-    const tokens = this.jwt.genToken({ userId: user.id })
+    const tokens = this.jwt.genToken({ userId: user.id, role: user.role })
 
     return {
       ...tokens,
