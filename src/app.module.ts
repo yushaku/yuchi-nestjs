@@ -10,7 +10,6 @@ import { ThrottlerStorageRedisService } from 'nestjs-throttler-storage-redis'
 
 import { AppController } from './app.controller'
 import { AuthModule } from './auth/auth.module'
-import { PrismaService } from './prisma.service'
 import { ShareModule } from './shared/share.module'
 import { UserModule } from './user/user.module'
 
@@ -86,18 +85,5 @@ import Joi from 'joi'
     ShareModule,
   ],
   controllers: [AppController],
-  providers: [
-    PrismaService,
-    {
-      provide: 'REDIS_CLIENT',
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        return new Redis({
-          host: config.get('REDIS_HOST'),
-          port: config.get('REDIS_PORT'),
-        })
-      },
-    },
-  ],
 })
 export class AppModule {}

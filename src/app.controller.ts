@@ -1,9 +1,9 @@
-import { Controller, Get, Inject } from '@nestjs/common'
+import { Controller, Get } from '@nestjs/common'
 
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { HealthCheckService, PrismaHealthIndicator } from '@nestjs/terminus'
-import { PrismaService } from './prisma.service'
-import Redis from 'ioredis'
+import { PrismaService } from './shared/prisma.service'
+import { RedisService } from './shared/redis.service'
 
 @ApiTags('App')
 @Controller()
@@ -12,7 +12,7 @@ export class AppController {
     private health: HealthCheckService,
     private db: PrismaHealthIndicator,
     private prisma: PrismaService,
-    @Inject('REDIS_CLIENT') private redis: Redis,
+    private redisService: RedisService,
   ) {}
 
   @Get()
@@ -20,9 +20,8 @@ export class AppController {
   getHello() {
     return {
       message: 'Yuchi API',
-      docs: `${process.env.API_URL}/docs`,
-      health: `${process.env.API_URL}/healthz`,
-      version: `${process.env.API_VERSION}`,
+      docs: `/docs`,
+      health: `/healthz`,
       uptime: process.uptime(),
     }
   }
@@ -36,7 +35,7 @@ export class AppController {
     return this.health.check([
       () => this.db.pingCheck('database', this.prisma),
       async () => {
-        const result = await this.redis.ping()
+        const result = await this.redisService.getClient().ping()
         if (result === 'PONG') {
           return { redis: { status: 'up' } }
         }
