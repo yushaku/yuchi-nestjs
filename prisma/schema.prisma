@@ -13,21 +13,179 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id       String  @id @default(uuid())
-  email    String  @unique
-  name     String?
-  posts    Post[]
-  password String
+enum PlanType {
+  FREE
+  MONTHLY
+  YEARLY
+  LIFETIME
 }
 
-model Post {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  title     String   @db.VarChar(255)
-  content   String?
-  published Boolean  @default(false)
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
+enum SubStatus {
+  ACTIVE
+  EXPIRED
+  CANCELED // User hủy gia hạn nhưng vẫn còn hạn dùng
+  GRACE_PERIOD // Apple/Google đang thử charge lại tiền
+}
+
+enum CodeStatus {
+  UNUSED // Chưa sử dụng
+  USED // Đã được sử dụng
+  EXPIRED // Đã hết hạn
+}
+
+enum Role {
+  ADMIN // Quản trị viên - toàn quyền
+  SALE // Nhân viên bán hàng - có thể tạo và quản lý subscription code
+  MEMBER // Thành viên thường - user bình thường
+}
+
+model User {
+  id             String             @id @default(uuid())
+  email          String             @unique
+  name           String?
+  password       String
+  role           Role               @default(MEMBER) // Phân quyền: ADMIN, SALE, MEMBER
+  wordProgresses UserWordProgress[]
+  subscriptions  Subscription[]
+
+  @@index([role]) // Index để query user theo role
+}
+
+// ============================================
+// TOPIK Vocabulary Learning Models
+// ============================================
+// Note: TOPIK levels are defined as constants in src/shared/constant.ts
+// Valid levels: 1 (Beginner), 2 (Intermediate), 3 (Advanced)
+
+model LearningGroup {
+  id         String     @id @default(uuid())
+  name       String // "Chào hỏi & Thông tin cá nhân"
+  icon       String? // "👋"
+  topikLevel Int // 1, 2, or 3 (references TOPIK_LEVEL enum in constant.ts)
+  categories Category[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([topikLevel])
+}
+
+model Category {
+  id          String         @id @default(uuid())
+  name        String // "인사 (Chào hỏi)"
+  description String?
+  icon        String? // "👋"
+  order       Int            @default(0)
+  topikLevel  Int? // 1, 2, or 3 (references TOPIK_LEVEL enum in constant.ts)
+  group       LearningGroup? @relation(fields: [groupId], references: [id])
+  groupId     String?
+  words       Vocabulary[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([topikLevel])
+  @@index([groupId])
+}
+
+model Vocabulary {
+  id                 String             @id @default(uuid())
+  korean             String // "안녕하세요"
+  hanja              String? // Hanja characters
+  vietnamese         String // "Xin chào"
+  pronunciation      String // "annyeonghaseyo"
+  example            String? // Korean example sentence
+  exampleTranslation String? // Vietnamese translation of example
+  category           Category           @relation(fields: [categoryId], references: [id])
+  categoryId         String
+  quizQuestions      QuizQuestion[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  userWordProgresses UserWordProgress[]
+
+  @@index([categoryId])
+  @@index([korean])
+}
+
+model QuizQuestion {
+  id                  String     @id @default(uuid())
+  question            String // Korean question
+  questionTranslation String? // Vietnamese translation
+  options             String[] // Array of options
+  correctAnswer       String // Correct answer
+  explanation         String? // Explanation in Vietnamese
+  Vocabulary          Vocabulary @relation(fields: [VocabularyId], references: [id])
+  VocabularyId        String
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@index([VocabularyId])
+}
+
+model UserWordProgress {
+  userId  String
+  vocabId String
+
+  // Core SRS Data - Only fields needed for calculation
+  reviewLevel Int     @default(0) @db.SmallInt // 0-4: Maps to ReviewLevel enum (level1-level5)
+  isIgnored   Boolean @default(false) // Filter words from review
+
+  // Review Tracking - Required for SRS calculation
+  lastReviewed  DateTime @default(now()) // Thời điểm ôn tập lần cuối (used to calculate nextReview)
+  nextReview    DateTime // Quan trọng nhất để query "Thời điểm vàng" (calculated from reviewLevel)
+  correctCount  Int      @default(0) // Số lần trả lời đúng (used for level progression)
+  totalAttempts Int      @default(0) // Tổng số lần thử (used for statistics)
+
+  // Optional tracking
+  learnedAt DateTime @default(now()) // Thời điểm học từ lần đầu (for analytics)
+
+  // Quan hệ
+  user  User       @relation(fields: [userId], references: [id])
+  vocab Vocabulary @relation(fields: [vocabId], references: [id])
+
+  // KEY TỐI ƯU 1: Composite Primary Key
+  // Đảm bảo tính duy nhất + Tự động tạo Index cho cặp này
+  @@id([userId, vocabId])
+  // KEY TỐI ƯU 2: Index cho truy vấn SRS
+  // Giúp query: "Lấy những từ của user X cần ôn trước giờ Y" cực nhanh
+  @@index([userId, nextReview])
+}
+
+// ============================================
+// Subscription Models
+// ============================================
+
+model SubscriptionCode {
+  id        String     @id @default(uuid())
+  code      String     @unique // Mã code duy nhất (ví dụ: "PROMO2024ABC")
+  planType  PlanType // Loại plan: MONTHLY, YEARLY, LIFETIME
+  duration  Int? // Số tháng (null nếu LIFETIME, 1 cho MONTHLY, 12 cho YEARLY)
+  status    CodeStatus @default(UNUSED)
+  expiresAt DateTime? // Ngày hết hạn code (null = không giới hạn)
+  usedAt    DateTime? // Thời điểm code được sử dụng
+  usedBy    String? // userId đã sử dụng code này
+  note      String? // Ghi chú của nhân viên khi tạo code
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Quan hệ
+  subscription Subscription? // Subscription được tạo từ code này
+
+  @@index([code]) // Index để tìm code nhanh
+  @@index([usedBy]) // Index để query code đã dùng bởi user nào
+}
+
+model Subscription {
+  id        String    @id @default(uuid())
+  userId    String
+  planType  PlanType
+  status    SubStatus @default(ACTIVE)
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+  codeId    String?   @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User              @relation(fields: [userId], references: [id])
+  code SubscriptionCode? @relation(fields: [codeId], references: [id])
+
+  @@index([userId])
 }
