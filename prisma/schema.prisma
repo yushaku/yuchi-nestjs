@@ -16,6 +16,8 @@ datasource db {
 enum PlanType {
   FREE
   MONTHLY
+  QUARTERLY
+  HALF_YEARLY
   YEARLY
   LIFETIME
 }
@@ -30,7 +32,6 @@ enum SubStatus {
 enum CodeStatus {
   UNUSED // Chưa sử dụng
   USED // Đã được sử dụng
-  EXPIRED // Đã hết hạn
 }
 
 enum Role {
@@ -157,7 +158,6 @@ model SubscriptionCode {
   id        String     @id @default(uuid())
   code      String     @unique // Mã code duy nhất (ví dụ: "PROMO2024ABC")
   planType  PlanType // Loại plan: MONTHLY, YEARLY, LIFETIME
-  duration  Int? // Số tháng (null nếu LIFETIME, 1 cho MONTHLY, 12 cho YEARLY)
   status    CodeStatus @default(UNUSED)
   expiresAt DateTime? // Ngày hết hạn code (null = không giới hạn)
   usedAt    DateTime? // Thời điểm code được sử dụng

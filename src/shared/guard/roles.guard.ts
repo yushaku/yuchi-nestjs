@@ -56,3 +56,30 @@ export class SaleGuard extends JwtAuthGuard {
     return true
   }
 }
+
+@Injectable()
+export class AdminOrSaleGuard extends JwtAuthGuard {
+  constructor(authService: JWTService) {
+    super(authService)
+  }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    // First check authentication
+    const isAuthenticated = await super.canActivate(context)
+    if (!isAuthenticated) {
+      return false
+    }
+
+    // Then check role
+    const request = context.switchToHttp().getRequest()
+    const user = request.user as JwtDecoded
+
+    if (user?.role !== 'ADMIN' && user?.role !== 'SALE') {
+      throw new ForbiddenException(
+        'Only admin or sale staff can access this resource',
+      )
+    }
+
+    return true
+  }
+}

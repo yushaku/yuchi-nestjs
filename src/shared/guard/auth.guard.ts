@@ -21,9 +21,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const response = context.switchToHttp().getResponse()
 
     try {
-      const accessToken = ExtractJwt.fromExtractors([this.cookieExtractor])(
-        request,
-      )
+      // Try to get token from Authorization header first, then cookies
+      let accessToken = this.getTokenFromHeader(request)
+      if (!accessToken) {
+        accessToken = ExtractJwt.fromExtractors([this.cookieExtractor])(request)
+      }
 
       if (!accessToken)
         throw new UnauthorizedException('Access token is not set')
@@ -31,25 +33,38 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       const isOk = await this.authService.validateToken(accessToken)
       if (isOk) return this.activate(context)
 
-      const refreshToken = request.cookies[TOKEN.REFRESH]
-      if (!refreshToken)
-        throw new UnauthorizedException('Refresh token is not set')
+      // Only try refresh token if using cookies (not Authorization header)
+      if (!this.getTokenFromHeader(request)) {
+        const refreshToken = request.cookies[TOKEN.REFRESH]
+        if (!refreshToken)
+          throw new UnauthorizedException('Refresh token is not set')
 
-      const newToken = await this.authService.refreshToken(refreshToken)
-      if (!newToken)
-        throw new UnauthorizedException('Refresh token is not valid')
+        const newToken = await this.authService.refreshToken(refreshToken)
+        if (!newToken)
+          throw new UnauthorizedException('Refresh token is not valid')
 
-      const jwtOption = this.authService.option()
-      response.cookie(TOKEN.ACCESS, newToken, jwtOption)
-      request.cookies[TOKEN.ACCESS] = newToken
+        const jwtOption = this.authService.option()
+        response.cookie(TOKEN.ACCESS, newToken, jwtOption)
+        request.cookies[TOKEN.ACCESS] = newToken
 
-      return this.activate(context)
+        return this.activate(context)
+      }
+
+      throw new UnauthorizedException('Token is invalid')
     } catch (error) {
       response.clearCookie(TOKEN.ACCESS)
       response.clearCookie(TOKEN.REFRESH)
 
       return false
     }
+  }
+
+  private getTokenFromHeader(request: FastifyRequest): string | null {
+    const authorization = request.headers.authorization || ''
+    if (authorization.startsWith('Bearer ')) {
+      return authorization.replace('Bearer ', '')
+    }
+    return null
   }
 
   async activate(context: ExecutionContext): Promise<boolean> {
