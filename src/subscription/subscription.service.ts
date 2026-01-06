@@ -3,8 +3,11 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  OnModuleInit,
+  Logger,
 } from '@nestjs/common'
 import { PrismaService } from '@/shared/prisma.service'
+import { BloomFilter } from '@/shared/bloom-filter'
 import { CreateSubscriptionCodeDto } from './dto/create-subscription-code.dto'
 import {
   SearchSubscriptionCodesDto,
@@ -13,38 +16,65 @@ import {
 import { CodeStatus, PlanType } from '../../generated/prisma/client'
 
 @Injectable()
-export class SubscriptionService {
-  constructor(private prisma: PrismaService) {}
+export class SubscriptionService implements OnModuleInit {
+  private readonly logger = new Logger(SubscriptionService.name)
+  private bloomFilter: BloomFilter
+  private readonly bloomFilterSize = 100000 // Can handle ~10k items with ~1% false positive rate
+  private readonly bloomFilterHashCount = 3
+
+  constructor(private prisma: PrismaService) {
+    // Initialize Bloom Filter with reasonable size for subscription codes
+    this.bloomFilter = new BloomFilter(
+      this.bloomFilterSize,
+      this.bloomFilterHashCount,
+    )
+  }
+
+  async onModuleInit() {
+    // Pre-populate Bloom Filter with existing codes for better performance
+    try {
+      const existingCodes = await this.prisma.subscriptionCode.findMany({
+        select: { code: true },
+      })
+      this.bloomFilter.addBulk(existingCodes.map((c) => c.code))
+      this.logger.log(
+        `Bloom Filter initialized with ${existingCodes.length} existing codes`,
+      )
+    } catch (error) {
+      this.logger.warn('Failed to pre-populate Bloom Filter', error)
+      // Continue without pre-population - filter will populate as codes are created
+    }
+  }
 
   private async generateUniqueCode(): Promise<string> {
     let code: string
-    let isUnique = false
     let attempts = 0
-    const maxAttempts = 10
+    const maxAttempts = 20 // Increased since Bloom Filter may cause more retries
 
-    while (!isUnique && attempts < maxAttempts) {
+    while (attempts < maxAttempts) {
       // Generate code: PREFIX + timestamp + random alphanumeric
       const timestamp = Date.now().toString(36).toUpperCase()
       const random = Math.random().toString(36).substring(2, 6).toUpperCase()
       code = `PROMO${timestamp}${random}`
 
-      const existingCode = await this.prisma.subscriptionCode.findUnique({
-        where: { code },
-      })
-
-      if (!existingCode) {
-        isUnique = true
+      // Fast check with Bloom Filter
+      // Bloom Filters have NO false negatives: if it says "doesn't exist", it definitely doesn't
+      // Bloom Filters CAN have false positives: if it says "might exist", it might not actually exist
+      if (!this.bloomFilter.mightContain(code)) {
+        // Bloom Filter says it definitely doesn't exist (no false negatives possible)
+        // Add to filter and return - no DB check needed!
+        this.bloomFilter.add(code)
+        return code
       }
+
+      // Bloom Filter says it might exist (could be false positive)
+      // Accept the false positive and try again - skip DB check for performance
       attempts++
     }
 
-    if (!isUnique) {
-      throw new ConflictException(
-        'Failed to generate unique code after multiple attempts',
-      )
-    }
-
-    return code
+    throw new ConflictException(
+      'Failed to generate unique code after multiple attempts',
+    )
   }
 
   async createSubscriptionCode(dto: CreateSubscriptionCodeDto) {
@@ -54,7 +84,7 @@ export class SubscriptionService {
     // If count is 1, return single code (backward compatible)
     if (count === 1) {
       const code = await this.generateUniqueCode()
-      return this.prisma.subscriptionCode.create({
+      const created = await this.prisma.subscriptionCode.create({
         data: {
           code,
           planType: dto.planType,
@@ -62,6 +92,8 @@ export class SubscriptionService {
           note: dto.note || null,
         },
       })
+      // Code already added to Bloom Filter in generateUniqueCode
+      return created
     }
 
     // Batch create for count > 1
@@ -85,6 +117,9 @@ export class SubscriptionService {
         }),
       ),
     )
+
+    // Add all created codes to Bloom Filter
+    this.bloomFilter.addBulk(createdCodes.map((c) => c.code))
 
     return {
       created: createdCodes.length,
@@ -170,13 +205,20 @@ export class SubscriptionService {
 
     // Check if code is being updated and if it conflicts
     if (data.code && data.code !== code.code) {
-      const existingCode = await this.prisma.subscriptionCode.findUnique({
-        where: { code: data.code },
-      })
+      // Fast check with Bloom Filter first
+      if (this.bloomFilter.mightContain(data.code)) {
+        // Might exist, check DB
+        const existingCode = await this.prisma.subscriptionCode.findUnique({
+          where: { code: data.code },
+        })
 
-      if (existingCode) {
-        throw new ConflictException('Subscription code already exists')
+        if (existingCode) {
+          throw new ConflictException('Subscription code already exists')
+        }
       }
+      // If Bloom Filter says it doesn't exist, it's safe (false positive accepted)
+      // Add new code to Bloom Filter
+      this.bloomFilter.add(data.code)
     }
 
     // Can't update used codes
