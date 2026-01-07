@@ -11,11 +11,42 @@ import {
   UsersListResponseDto,
   UserResponseDto,
   Role,
+  CreateUserDto,
 } from './dto/user.dto'
+import * as bcrypt from 'bcryptjs'
 
 @Injectable()
 export class UserService {
   constructor(private prisma: PrismaService) {}
+
+  async createUser(dto: CreateUserDto): Promise<UserResponseDto> {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    })
+
+    if (existingUser) {
+      throw new BadRequestException('User with this email already exists')
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10)
+
+    const user = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        password: hashedPassword,
+        name: dto.name || null,
+        role: dto.role,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    })
+
+    return user as UserResponseDto
+  }
 
   async userInfo(userId: string) {
     const user = await this.prisma.user.findUnique({

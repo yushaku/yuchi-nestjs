@@ -5,6 +5,7 @@ import {
   Controller,
   Get,
   Put,
+  Post,
   Param,
   Query,
   Body,
@@ -22,6 +23,7 @@ import {
   UpdateUserRoleDto,
   UsersListResponseDto,
   UserResponseDto,
+  CreateUserDto,
 } from './dto/user.dto'
 
 @ApiBearerAuth()
@@ -29,6 +31,14 @@ import {
 @ApiTags('users')
 export class UserController {
   constructor(private userService: UserService) {}
+
+  @Post()
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Create a new user (Admin only)' })
+  @ApiResponse({ type: UserResponseDto })
+  createUser(@Body() dto: CreateUserDto) {
+    return this.userService.createUser(dto)
+  }
 
   @Get('info')
   @UseGuards(JwtAuthGuard)

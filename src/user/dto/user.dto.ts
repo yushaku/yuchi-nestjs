@@ -60,6 +60,31 @@ export class UpdateUserRoleDto extends createZodDto(UpdateUserRoleSchema) {
   role: Role
 }
 
+export const CreateUserSchema = z.object({
+  email: z.email('Invalid email format'),
+  password: z.string().min(6, 'Password must be at least 6 characters long'),
+  name: z.string().optional(),
+  role: RoleSchema.optional().default(Role.MEMBER),
+})
+
+export class CreateUserDto extends createZodDto(CreateUserSchema) {
+  @ApiProperty({ description: 'User email' })
+  email: string
+
+  @ApiProperty({ description: 'User password (min 6 chars)' })
+  password: string
+
+  @ApiPropertyOptional({ description: 'User name' })
+  name?: string
+
+  @ApiPropertyOptional({
+    enum: Role,
+    default: Role.MEMBER,
+    description: 'User role',
+  })
+  role: Role
+}
+
 export class UserResponseDto {
   @ApiProperty({ description: 'User ID' })
   id: string
