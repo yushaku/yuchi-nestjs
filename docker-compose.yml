@@ -3,56 +3,47 @@ services:
     container_name: yuchi-server
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     ports:
-      - ${APP_PORT}:${APP_PORT}
-    expose:
-      - '8080'
-    volumes:
-      - .:/app
-      - node_modules:/app/node_modules
+      - '8888:8888'
     networks:
       - backend
+    env_file:
+      - .env.prod
     deploy:
       replicas: 1
       resources:
         limits:
           cpus: '2.0'
           memory: 3.75g
-    environment:
-      - REDIS_HOST=redis
-      - DB_HOST=postgres
 
-  redis:
+  yuchi-redis:
     image: redis:7.0-alpine
-    container_name: redis
-    ports:
-      - ${REDIS_PORT:-6379}:6379
+    container_name: yuchi-redis
     networks:
       - backend
 
-  redis-commander:
+  yuchi-redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: redis-commander
+    container_name: yuchi-redis-commander
     restart: unless-stopped
     environment:
-      - REDIS_HOSTS=redis
+      - REDIS_HOSTS=yuchi-redis
     ports:
-      - ${REDIS_COMMAND_PORT:-8081}:8081
+      - 8082:8081
     networks:
       - backend
 
-  postgres:
+  yuchi-postgres:
     image: postgres:16.2
-    container_name: postgres
+    container_name: yuchi-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_DB_MAIN: ${DB_MAIN}
-      POSTGRES_DB_TEST: ${DB_TEST}
     ports:
-      - ${DB_PORT:-5432}:5432
+      - 5433:5432
     volumes:
       - pg_data:/var/lib/postgresql/data
     networks:
