@@ -17,23 +17,45 @@ import {
 } from '@nestjs/swagger'
 import { SubscriptionService } from './subscription.service'
 import { CreateSubscriptionCodeDto } from './dto/create-subscription-code.dto'
+import { ApplySubscriptionCodeDto } from './dto/apply-subscription-code.dto'
 import {
   SearchSubscriptionCodesDto,
   SubscriptionCodeResponseDto,
   SubscriptionCodesListResponseDto,
+  SubscriptionResponseDto,
 } from './dto/subscription-code.dto'
 import { AdminOrSaleGuard } from '@/shared/guard/roles.guard'
+import { JwtAuthGuard } from '@/shared/guard/auth.guard'
+import { JwtUser, JwtDecoded } from '@/shared/decorators/JwtUser.decorator'
 import { ThrottlerGuard } from '@nestjs/throttler'
 
 @ApiTags('Subscription')
 @ApiBearerAuth()
 @Controller('subscription')
-@UseGuards(AdminOrSaleGuard)
 @UseGuards(ThrottlerGuard)
 export class SubscriptionController {
   constructor(private subscriptionService: SubscriptionService) {}
 
+  @Post('apply')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Apply/redeem a subscription code',
+    description:
+      'Apply a subscription code to activate a subscription for the current user',
+  })
+  @ApiResponse({
+    type: SubscriptionResponseDto,
+    description: 'Subscription created successfully',
+  })
+  async applySubscriptionCode(
+    @JwtUser() { userId }: JwtDecoded,
+    @Body() dto: ApplySubscriptionCodeDto,
+  ) {
+    return this.subscriptionService.applySubscriptionCode(userId, dto)
+  }
+
   @Post('code')
+  @UseGuards(AdminOrSaleGuard)
   @ApiOperation({
     summary: 'Create subscription code(s) (Admin or Sale only)',
     description:
@@ -48,6 +70,7 @@ export class SubscriptionController {
   }
 
   @Get('codes')
+  @UseGuards(AdminOrSaleGuard)
   @ApiOperation({
     summary: 'Search and list subscription codes (Admin or Sale only)',
   })
@@ -57,6 +80,7 @@ export class SubscriptionController {
   }
 
   @Get('code/:id')
+  @UseGuards(AdminOrSaleGuard)
   @ApiOperation({
     summary: 'Get subscription code by ID (Admin or Sale only)',
   })
@@ -66,6 +90,7 @@ export class SubscriptionController {
   }
 
   @Put('code/:id')
+  @UseGuards(AdminOrSaleGuard)
   @ApiOperation({
     summary: 'Update subscription code (Admin or Sale only)',
   })
@@ -93,6 +118,7 @@ export class SubscriptionController {
   }
 
   @Delete('code/:id')
+  @UseGuards(AdminOrSaleGuard)
   @ApiOperation({
     summary: 'Delete subscription code (Admin or Sale only)',
   })

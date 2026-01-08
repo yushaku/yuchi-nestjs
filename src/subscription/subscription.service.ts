@@ -13,7 +13,8 @@ import {
   SearchSubscriptionCodesDto,
   SubscriptionCodesListResponseDto,
 } from './dto/subscription-code.dto'
-import { CodeStatus, PlanType } from '../../generated/prisma/client'
+import { ApplySubscriptionCodeDto } from './dto/apply-subscription-code.dto'
+import { CodeStatus, PlanType, SubStatus } from '../../generated/prisma/client'
 
 @Injectable()
 export class SubscriptionService implements OnModuleInit {
@@ -266,5 +267,107 @@ export class SubscriptionService implements OnModuleInit {
     return this.prisma.subscriptionCode.delete({
       where: { id },
     })
+  }
+
+  /**
+   * Calculate subscription end date based on plan type
+   */
+  private calculateEndDate(planType: PlanType, startDate: Date): Date | null {
+    const endDate = new Date(startDate)
+
+    switch (planType) {
+      case PlanType.MONTHLY:
+        endDate.setMonth(endDate.getMonth() + 1)
+        return endDate
+      case PlanType.QUARTERLY:
+        endDate.setMonth(endDate.getMonth() + 3)
+        return endDate
+      case PlanType.HALF_YEARLY:
+        endDate.setMonth(endDate.getMonth() + 6)
+        return endDate
+      case PlanType.YEARLY:
+        endDate.setFullYear(endDate.getFullYear() + 1)
+        return endDate
+      case PlanType.LIFETIME:
+        return null // Lifetime subscriptions have no end date
+      case PlanType.FREE:
+        return null // Free plan has no end date
+      default:
+        throw new BadRequestException(`Invalid plan type: ${planType}`)
+    }
+  }
+
+  /**
+   * Apply/redeem a subscription code for a user
+   */
+  async applySubscriptionCode(userId: string, dto: ApplySubscriptionCodeDto) {
+    const code = await this.prisma.subscriptionCode.findUnique({
+      where: { code: dto.code },
+    })
+    if (!code) throw new NotFoundException('Subscription code not found')
+
+    if (code.status === CodeStatus.USED) {
+      throw new BadRequestException(
+        'This subscription code has already been used',
+      )
+    }
+    const now = new Date()
+    if (code.expiresAt && now > code.expiresAt) {
+      throw new BadRequestException('This subscription code has expired')
+    }
+
+    // Check if user already has an active subscription that is still valid
+    const activeSubscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: SubStatus.ACTIVE,
+        OR: [
+          { endDate: null }, // Lifetime subscription
+          { endDate: { gt: now } }, // Subscription not expired yet
+        ],
+      },
+    })
+
+    if (activeSubscription) {
+      throw new ConflictException(
+        'You already have an active subscription. Please wait until it expires before applying a new code.',
+      )
+    }
+
+    // Calculate end date based on plan type
+    const startDate = new Date()
+    const endDate = this.calculateEndDate(code.planType, startDate)
+
+    // Create subscription and mark code as used in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Create subscription
+      const subscription = await tx.subscription.create({
+        data: {
+          userId,
+          planType: code.planType,
+          startDate,
+          endDate,
+          codeId: code.id,
+          status: SubStatus.ACTIVE,
+        },
+        include: {
+          code: true,
+        },
+      })
+
+      // Mark code as used
+      await tx.subscriptionCode.update({
+        where: { id: code.id },
+        data: {
+          status: CodeStatus.USED,
+          usedAt: new Date(),
+          usedBy: userId,
+        },
+      })
+
+      return subscription
+    })
+
+    return result
   }
 }

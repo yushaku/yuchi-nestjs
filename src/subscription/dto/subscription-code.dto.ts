@@ -1,7 +1,11 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { PlanType, CodeStatus } from '../../../generated/prisma/client'
+import {
+  PlanType,
+  CodeStatus,
+  SubStatus,
+} from '../../../generated/prisma/client'
 
 const PlanTypeEnum = z.enum(PlanType)
 const CodeStatusEnum = z.enum(CodeStatus)
@@ -103,4 +107,36 @@ export class SubscriptionCodesListResponseDto {
 
   @ApiProperty({ description: 'Total pages' })
   totalPages: number
+}
+
+export class SubscriptionResponseDto {
+  @ApiProperty({ description: 'Subscription ID' })
+  id: string
+
+  @ApiProperty({ description: 'User ID' })
+  userId: string
+
+  @ApiProperty({ enum: PlanType, description: 'Plan type' })
+  planType: PlanType
+
+  @ApiProperty({ enum: SubStatus, description: 'Subscription status' })
+  status: SubStatus
+
+  @ApiProperty({ description: 'Start date' })
+  startDate: Date
+
+  @ApiPropertyOptional({ description: 'End date (null for lifetime)' })
+  endDate: Date | null
+
+  @ApiPropertyOptional({ description: 'Code ID used for this subscription' })
+  codeId: string | null
+
+  @ApiProperty({ description: 'Created at' })
+  createdAt: Date
+
+  @ApiProperty({ description: 'Updated at' })
+  updatedAt: Date
+
+  @ApiPropertyOptional({ type: SubscriptionCodeResponseDto })
+  code?: SubscriptionCodeResponseDto
 }
