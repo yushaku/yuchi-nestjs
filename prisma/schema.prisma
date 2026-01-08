@@ -135,9 +135,6 @@ model UserWordProgress {
   correctCount  Int      @default(0) // Số lần trả lời đúng (used for level progression)
   totalAttempts Int      @default(0) // Tổng số lần thử (used for statistics)
 
-  // Optional tracking
-  learnedAt DateTime @default(now()) // Thời điểm học từ lần đầu (for analytics)
-
   // Quan hệ
   user  User       @relation(fields: [userId], references: [id])
   vocab Vocabulary @relation(fields: [vocabId], references: [id])

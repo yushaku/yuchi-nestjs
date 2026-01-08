@@ -10,6 +10,7 @@ import { ShareModule } from './shared/share.module'
 import { UserModule } from './user/user.module'
 import { LearningModule } from './learning/learning.module'
 import { SubscriptionModule } from './subscription/subscription.module'
+import { SyncModule } from './sync/sync.module'
 
 import Redis from 'ioredis'
 import Joi from 'joi'
@@ -57,6 +58,7 @@ import Joi from 'joi'
     ShareModule,
     LearningModule,
     SubscriptionModule,
+    SyncModule,
   ],
   controllers: [AppController],
 })
