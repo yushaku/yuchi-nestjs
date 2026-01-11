@@ -29,6 +29,8 @@ import Joi from 'joi'
 
         GOOGLE_CLIENT_ID: Joi.string().required(),
         GOOGLE_CLIENT_SECRET: Joi.string().required(),
+        GOOGLE_CLIENT_ANDROID_ID: Joi.string().optional(),
+        GOOGLE_CLIENT_IOS_ID: Joi.string().optional(),
 
         THROTTLE_LIMIT: Joi.number().default(20),
         THROTTLE_TTL: Joi.number().default(60),

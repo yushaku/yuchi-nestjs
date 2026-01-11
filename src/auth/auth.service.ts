@@ -9,15 +9,24 @@ import { AuthResponseDto } from './dto/auth.dto'
 @Injectable()
 export class AuthService {
   private googleClient: OAuth2Client
-  private googleClientId: string
+  private googleClientIds: string[] = []
 
   constructor(
     private prisma: PrismaService,
     private jwt: JWTService,
     private config: ConfigService,
   ) {
-    this.googleClientId = this.config.get('GOOGLE_CLIENT_ID')
-    this.googleClient = new OAuth2Client(this.googleClientId)
+    const webClientId = this.config.get('GOOGLE_CLIENT_ID')
+    const androidClientId = this.config.get('GOOGLE_CLIENT_ANDROID_ID')
+    const iosClientId = this.config.get('GOOGLE_CLIENT_IOS_ID')
+
+    if (webClientId) this.googleClientIds.push(webClientId)
+    if (androidClientId) this.googleClientIds.push(androidClientId)
+    if (iosClientId) this.googleClientIds.push(iosClientId)
+
+    // Use the first client ID (web) for OAuth2Client initialization
+    // The verifyIdToken will check against all client IDs
+    this.googleClient = new OAuth2Client()
   }
 
   async login(email: string, password: string): Promise<AuthResponseDto> {
@@ -83,10 +92,11 @@ export class AuthService {
 
   async googleAuthWithIdToken(idToken: string): Promise<AuthResponseDto> {
     try {
-      // Verify the ID token with Google
+      // Verify the ID token with Google against all available client IDs
+      // This supports web, Android, and iOS clients
       const ticket = await this.googleClient.verifyIdToken({
         idToken,
-        audience: this.googleClientId,
+        audience: this.googleClientIds,
       })
 
       const payload = ticket.getPayload()
