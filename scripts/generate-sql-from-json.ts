@@ -34,6 +34,7 @@ interface LearningData {
   description: string
   group_name: string
   group_icon: string
+  group_order?: number
   categories: Category[]
 }
 
@@ -56,7 +57,26 @@ function formatPostgresArray(arr: string[]): string {
   return `ARRAY[${escaped.join(', ')}]::text[]`
 }
 
-function generateSQL(data: LearningData): string {
+/**
+ * Extract group order from filename
+ * Examples:
+ * - "topik1_group1" -> 1
+ * - "topik2_group5" -> 5
+ * - "topik3_group10" -> 10
+ * Returns null if pattern not found
+ */
+function extractGroupOrderFromFilename(fileName: string): number | null {
+  const match = fileName.match(/group(\d+)$/i)
+  if (match && match[1]) {
+    return parseInt(match[1], 10)
+  }
+  return null
+}
+
+function generateSQL(
+  data: LearningData,
+  groupOrderFromFilename?: number,
+): string {
   const now = new Date().toISOString()
   const sqlStatements: string[] = []
 
@@ -86,11 +106,14 @@ function generateSQL(data: LearningData): string {
 
   // 1. Insert LearningGroup (UUID)
   sqlStatements.push(`-- LearningGroup: ${data.group_name}`)
+  // Priority: filename > JSON data > default 0
+  const groupOrder = groupOrderFromFilename ?? data.group_order ?? 0
   sqlStatements.push(
-    `INSERT INTO "LearningGroup" (id, name, icon, "topikLevel", "createdAt", "updatedAt") VALUES (` +
+    `INSERT INTO "LearningGroup" (id, name, icon, "order", "topikLevel", "createdAt", "updatedAt") VALUES (` +
       `${escapeSqlString(groupId)}, ` +
       `${escapeSqlString(data.group_name)}, ` +
       `${escapeSqlString(data.group_icon)}, ` +
+      `${groupOrder}, ` +
       `${data.topik_level}, ` +
       `${escapeSqlString(now)}, ` +
       `${escapeSqlString(now)}` +
@@ -231,7 +254,15 @@ try {
       const jsonData = fs.readFileSync(jsonFilePath, 'utf-8')
       const data: LearningData = JSON.parse(jsonData)
 
-      const sql = generateSQL(data)
+      // Extract group order from filename (e.g., "topik1_group1" -> 1)
+      const groupOrderFromFilename = extractGroupOrderFromFilename(fileName)
+      if (groupOrderFromFilename !== null) {
+        console.log(
+          `  → Extracted groupOrder from filename: ${groupOrderFromFilename}`,
+        )
+      }
+
+      const sql = generateSQL(data, groupOrderFromFilename ?? undefined)
 
       // Save individual SQL file
       const outputPath = path.join(__dirname, `./generated-${fileName}.sql`)

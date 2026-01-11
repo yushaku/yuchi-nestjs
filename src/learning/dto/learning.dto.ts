@@ -40,6 +40,9 @@ export class LearningGroupDto {
   icon?: string | null
 
   @ApiProperty()
+  order: number
+
+  @ApiProperty()
   topikLevel: number
 
   @ApiProperty({ type: [CategoryDto], required: false })

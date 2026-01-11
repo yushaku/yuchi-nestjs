@@ -5,6 +5,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 const CreateLearningGroupItemSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   icon: z.string().optional().nullable(),
+  order: z.number().int().optional(),
   topikLevel: z.number().int().min(1).max(3),
 })
 
@@ -12,6 +13,7 @@ const UpdateLearningGroupItemSchema = z.object({
   id: z.string().uuid('Invalid UUID format'),
   name: z.string().min(1).optional(),
   icon: z.string().optional().nullable(),
+  order: z.number().int().optional(),
   topikLevel: z.number().int().min(1).max(3).optional(),
 })
 
@@ -45,6 +47,12 @@ export class CreateLearningGroupItemDto extends createZodDto(
   @ApiPropertyOptional({ description: 'Icon emoji', example: '👋' })
   icon?: string | null
 
+  @ApiPropertyOptional({
+    description: 'Display order',
+    example: 0,
+  })
+  order?: number
+
   @ApiProperty({
     description: 'TOPIK level (1, 2, or 3)',
     example: 1,
@@ -65,6 +73,11 @@ export class UpdateLearningGroupItemDto extends createZodDto(
 
   @ApiPropertyOptional({ description: 'Icon emoji' })
   icon?: string | null
+
+  @ApiPropertyOptional({
+    description: 'Display order',
+  })
+  order?: number
 
   @ApiPropertyOptional({
     description: 'TOPIK level (1, 2, or 3)',

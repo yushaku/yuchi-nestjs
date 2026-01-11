@@ -62,6 +62,7 @@ model LearningGroup {
   id         String     @id @default(uuid())
   name       String // "Chào hỏi & Thông tin cá nhân"
   icon       String? // "👋"
+  order      Int        @default(0)
   topikLevel Int // 1, 2, or 3 (references TOPIK_LEVEL enum in constant.ts)
   categories Category[]
   createdAt  DateTime   @default(now())

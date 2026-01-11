@@ -43,6 +43,7 @@ export class LearningService {
         id: true,
         name: true,
         icon: true,
+        order: true,
         topikLevel: true,
         createdAt: true,
         updatedAt: true,
@@ -62,9 +63,14 @@ export class LearningService {
           },
         },
       },
-      orderBy: {
-        topikLevel: 'asc',
-      },
+      orderBy: [
+        {
+          topikLevel: 'asc',
+        },
+        {
+          order: 'asc',
+        },
+      ],
     })
   }
 
@@ -98,12 +104,14 @@ export class LearningService {
           data: {
             name: item.name,
             icon: item.icon ?? null,
+            order: item.order ?? 0,
             topikLevel: item.topikLevel,
           },
           select: {
             id: true,
             name: true,
             icon: true,
+            order: true,
             topikLevel: true,
             createdAt: true,
             updatedAt: true,
@@ -145,6 +153,7 @@ export class LearningService {
           data: {
             ...(item.name !== undefined && { name: item.name }),
             ...(item.icon !== undefined && { icon: item.icon }),
+            ...(item.order !== undefined && { order: item.order }),
             ...(item.topikLevel !== undefined && {
               topikLevel: item.topikLevel,
             }),
@@ -153,6 +162,7 @@ export class LearningService {
             id: true,
             name: true,
             icon: true,
+            order: true,
             topikLevel: true,
             createdAt: true,
             updatedAt: true,
