@@ -1,17 +1,24 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as bcrypt from 'bcryptjs'
+import { OAuth2Client } from 'google-auth-library'
 import { JWTService } from '../shared/jwt.service'
 import { PrismaService } from '@/shared/prisma.service'
 import { AuthResponseDto } from './dto/auth.dto'
 
 @Injectable()
 export class AuthService {
+  private googleClient: OAuth2Client
+  private googleClientId: string
+
   constructor(
     private prisma: PrismaService,
     private jwt: JWTService,
     private config: ConfigService,
-  ) {}
+  ) {
+    this.googleClientId = this.config.get('GOOGLE_CLIENT_ID')
+    this.googleClient = new OAuth2Client(this.googleClientId)
+  }
 
   async login(email: string, password: string): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({
@@ -74,36 +81,54 @@ export class AuthService {
     }
   }
 
-  async googleAuth(profile: {
-    email: string
-    name: string
-    password: string
-  }): Promise<AuthResponseDto> {
-    // Check if user exists
-    let user = await this.prisma.user.findUnique({
-      where: { email: profile.email },
-    })
-
-    // Create user if doesn't exist
-    if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          email: profile.email,
-          password: profile.password, // This is the provider-id format
-          name: profile.name,
-        },
+  async googleAuthWithIdToken(idToken: string): Promise<AuthResponseDto> {
+    try {
+      // Verify the ID token with Google
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: this.googleClientId,
       })
-    }
 
-    const tokens = this.jwt.genToken({ userId: user.id, role: user.role })
+      const payload = ticket.getPayload()
+      if (!payload) {
+        throw new UnauthorizedException('Invalid Google ID token')
+      }
 
-    return {
-      ...tokens,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      },
+      const { email, name, sub: googleId } = payload
+
+      if (!email) {
+        throw new UnauthorizedException('Email not provided by Google')
+      }
+
+      // Check if user exists
+      let user = await this.prisma.user.findUnique({
+        where: { email },
+      })
+
+      // Create user if doesn't exist
+      if (!user) {
+        user = await this.prisma.user.create({
+          data: {
+            email,
+            password: `google-${googleId}`, // Store Google ID as password identifier
+            name: name || null,
+          },
+        })
+      }
+
+      const tokens = this.jwt.genToken({ userId: user.id, role: user.role })
+
+      return {
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      }
+    } catch (error) {
+      console.error('Google ID token verification error:', error)
+      throw new UnauthorizedException('Invalid Google ID token')
     }
   }
 

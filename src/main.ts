@@ -30,17 +30,17 @@ async function bootstrap() {
   })
 
   // Passport compatibility with Fastify
-  // Add Express-compatible methods to Fastify response for Passport OAuth2
+  // Add Express-compatible methods to Fastify response for Passport JWT
   const instance = app.getHttpAdapter().getInstance()
   instance.addHook('onRequest', (request: any, reply: any, done: any) => {
-    // Add Express-compatible setHeader method for Passport OAuth2
+    // Add Express-compatible setHeader method for Passport JWT
     if (!reply.setHeader) {
       reply.setHeader = function (name: string, value: string) {
         reply.header(name, value)
         return this
       }
     }
-    // Add Express-compatible end method for Passport OAuth2
+    // Add Express-compatible end method for Passport JWT
     if (!reply.end) {
       reply.end = function (chunk?: any, encoding?: any) {
         if (chunk) {

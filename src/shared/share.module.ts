@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 import { JwtModule } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
 import { JWTService } from './jwt.service'
-import { GoogleStrategy, JwtStrategy } from './strategy'
+import { JwtStrategy } from './strategy'
 import { PrismaService } from './prisma.service'
 import { RedisService } from './redis.service'
 
@@ -23,13 +23,7 @@ import { RedisService } from './redis.service'
       }),
     }),
   ],
-  providers: [
-    JWTService,
-    JwtStrategy,
-    GoogleStrategy,
-    PrismaService,
-    RedisService,
-  ],
+  providers: [JWTService, JwtStrategy, PrismaService, RedisService],
   exports: [JWTService, PrismaService, RedisService],
 })
 export class ShareModule {}

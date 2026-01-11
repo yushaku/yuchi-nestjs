@@ -1,31 +1,17 @@
 import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+import { ApiProperty } from '@nestjs/swagger'
 
-export enum Platform {
-  WEB = 'web',
-  IOS = 'ios',
-  ANDROID = 'android',
-}
-
-const PlatformSchema = z.enum(Platform)
-
-export const GoogleAuthSchema = z.object({
-  platform: PlatformSchema,
-  deepLinkScheme: z.string().optional(),
+export const GoogleIdTokenSchema = z.object({
+  idToken: z.string().min(1, 'Google ID token is required'),
 })
 
-export class GoogleAuthDto extends createZodDto(GoogleAuthSchema) {
+export class GoogleIdTokenDto extends createZodDto(GoogleIdTokenSchema) {
   @ApiProperty({
-    enum: Platform,
-    description: 'Platform type: web, ios, or android',
+    description:
+      'Google ID token from client (typically from mobile apps or web Google Sign-In)',
   })
-  platform: Platform
-
-  @ApiPropertyOptional({
-    description: 'Mobile app deep link scheme (e.g., yuchiapp://)',
-  })
-  deepLinkScheme?: string
+  idToken: string
 }
 
 export class AuthResponseDto {
