@@ -14,6 +14,14 @@ import {
   ApiTags,
   ApiBearerAuth,
   ApiResponse,
+  ApiBody,
+  ApiParam,
+  ApiQuery,
+  ApiBadRequestResponse,
+  ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger'
 import { SubscriptionService } from './subscription.service'
 import { CreateSubscriptionCodeDto } from './dto/create-subscription-code.dto'
@@ -43,10 +51,18 @@ export class SubscriptionController {
     description:
       'Apply a subscription code to activate a subscription for the current user',
   })
+  @ApiBody({ type: ApplySubscriptionCodeDto })
   @ApiResponse({
+    status: 200,
     type: SubscriptionResponseDto,
     description: 'Subscription created successfully',
   })
+  @ApiBadRequestResponse({
+    description: 'Invalid subscription code or code already used',
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiNotFoundResponse({ description: 'Subscription code not found' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
   async applySubscriptionCode(
     @JwtUser() { userId }: JwtDecoded,
     @Body() dto: ApplySubscriptionCodeDto,
@@ -61,10 +77,18 @@ export class SubscriptionController {
     description:
       'Create a single code or multiple codes (count 2-100). Returns batch response for count>1.',
   })
+  @ApiBody({ type: CreateSubscriptionCodeDto })
   @ApiResponse({
+    status: 201,
     type: SubscriptionCodeResponseDto,
     description: 'Single code response when count=1',
   })
+  @ApiBadRequestResponse({ description: 'Invalid input data' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - Admin or Sale access required',
+  })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
   async createSubscriptionCode(@Body() dto: CreateSubscriptionCodeDto) {
     return this.subscriptionService.createSubscriptionCode(dto)
   }
@@ -74,7 +98,45 @@ export class SubscriptionController {
   @ApiOperation({
     summary: 'Search and list subscription codes (Admin or Sale only)',
   })
-  @ApiResponse({ type: SubscriptionCodesListResponseDto })
+  @ApiQuery({
+    name: 'query',
+    required: false,
+    description: 'Search query (code or note)',
+  })
+  @ApiQuery({
+    name: 'planType',
+    required: false,
+    enum: ['MONTHLY', 'YEARLY', 'LIFETIME'],
+    description: 'Filter by plan type',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['ACTIVE', 'USED', 'EXPIRED'],
+    description: 'Filter by status',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'perPage',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 20)',
+  })
+  @ApiResponse({
+    status: 200,
+    type: SubscriptionCodesListResponseDto,
+    description: 'Subscription codes retrieved successfully',
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - Admin or Sale access required',
+  })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
   async searchSubscriptionCodes(@Query() query: SearchSubscriptionCodesDto) {
     return this.subscriptionService.searchSubscriptionCodes(query)
   }
@@ -84,7 +146,18 @@ export class SubscriptionController {
   @ApiOperation({
     summary: 'Get subscription code by ID (Admin or Sale only)',
   })
-  @ApiResponse({ type: SubscriptionCodeResponseDto })
+  @ApiParam({ name: 'id', description: 'Subscription code ID' })
+  @ApiResponse({
+    status: 200,
+    type: SubscriptionCodeResponseDto,
+    description: 'Subscription code retrieved successfully',
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - Admin or Sale access required',
+  })
+  @ApiNotFoundResponse({ description: 'Subscription code not found' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
   async getSubscriptionCode(@Param('id') id: string) {
     return this.subscriptionService.getSubscriptionCodeById(id)
   }
@@ -94,7 +167,20 @@ export class SubscriptionController {
   @ApiOperation({
     summary: 'Update subscription code (Admin or Sale only)',
   })
-  @ApiResponse({ type: SubscriptionCodeResponseDto })
+  @ApiParam({ name: 'id', description: 'Subscription code ID' })
+  @ApiBody({ type: CreateSubscriptionCodeDto, required: false })
+  @ApiResponse({
+    status: 200,
+    type: SubscriptionCodeResponseDto,
+    description: 'Subscription code updated successfully',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid input data' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - Admin or Sale access required',
+  })
+  @ApiNotFoundResponse({ description: 'Subscription code not found' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
   async updateSubscriptionCode(
     @Param('id') id: string,
     @Body() dto: Partial<CreateSubscriptionCodeDto>,
@@ -122,6 +208,26 @@ export class SubscriptionController {
   @ApiOperation({
     summary: 'Delete subscription code (Admin or Sale only)',
   })
+  @ApiParam({ name: 'id', description: 'Subscription code ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Subscription code deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Subscription code deleted successfully',
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - Admin or Sale access required',
+  })
+  @ApiNotFoundResponse({ description: 'Subscription code not found' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
   async deleteSubscriptionCode(@Param('id') id: string) {
     return this.subscriptionService.deleteSubscriptionCode(id)
   }

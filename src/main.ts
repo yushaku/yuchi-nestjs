@@ -65,9 +65,20 @@ async function bootstrap() {
 
   // Swagger API Document
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('APIs document')
-    .addBearerAuth()
-    .setVersion('0.1.0')
+    .setTitle('Yuchi API')
+    .setDescription('API documentation for Yuchi - Korean learning application')
+    .setVersion('1.0.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
     .build()
 
   const document = SwaggerModule.createDocument(app, swaggerConfig)
