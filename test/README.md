@@ -12,12 +12,12 @@ Use a separate test database to avoid affecting your development database:
 
 1. Create a test database in PostgreSQL:
    ```sql
-   CREATE DATABASE yuchi_test;
+   CREATE DATABASE db_test;
    ```
 
 2. Set the `DATABASE_URL_TEST` environment variable:
    ```bash
-   export DATABASE_URL_TEST="postgresql://user:password@localhost:5432/yuchi_test"
+   export DATABASE_URL_TEST="postgresql://user:password@localhost:5432/db_test"
    ```
 
 3. Run Prisma migrations on the test database:
@@ -25,20 +25,13 @@ Use a separate test database to avoid affecting your development database:
    DATABASE_URL=$DATABASE_URL_TEST pnpm prisma db push
    ```
 
-### Option 2: Use Development Database
-
-If you prefer to use the same database (not recommended for CI/CD):
-
-1. The tests will use `DATABASE_URL` if `DATABASE_URL_TEST` is not set
-2. **Warning**: Tests will clean the database before and after running, so all data will be deleted!
-
 ## Environment Variables
 
 Create a `.env.test` file or set these environment variables:
 
 ```bash
 # Database (use test database URL)
-DATABASE_URL_TEST=postgresql://user:password@localhost:5432/yuchi_test
+DATABASE_URL_TEST=postgresql://user:password@localhost:5432/db_test
 # Or use regular DATABASE_URL if not using separate test DB
 DATABASE_URL=postgresql://user:password@localhost:5432/yuchi_dev
 

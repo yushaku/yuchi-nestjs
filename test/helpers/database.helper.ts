@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 import { PrismaClient } from '../../generated/prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 
 /**
  * Database helper for e2e tests
@@ -9,7 +10,68 @@ export class DatabaseHelper {
   private prisma: PrismaClient
 
   constructor() {
-    this.prisma = new PrismaClient()
+    const databaseUrl = process.env.DATABASE_URL
+    if (!databaseUrl) {
+      throw new Error(
+        'DATABASE_URL is not set. Make sure DATABASE_URL or DATABASE_URL_TEST is set in your test environment.',
+      )
+    }
+
+    // Validate DATABASE_URL format (mask password for security)
+    try {
+      const url = new URL(databaseUrl)
+      if (!url.hostname || !url.port || !url.pathname) {
+        throw new Error('Invalid DATABASE_URL format')
+      }
+    } catch (error) {
+      const maskedUrl = this.maskDatabaseUrl(databaseUrl)
+      throw new Error(
+        `Invalid DATABASE_URL format: ${maskedUrl}. ` +
+          'Expected format: postgresql://user:password@host:port/database',
+      )
+    }
+
+    // Use the same adapter pattern as PrismaService for consistency
+    const adapter = new PrismaPg({
+      connectionString: databaseUrl,
+    })
+    this.prisma = new PrismaClient({ adapter })
+  }
+
+  /**
+   * Mask database URL password for error messages
+   */
+  private maskDatabaseUrl(url: string): string {
+    try {
+      const urlObj = new URL(url)
+      if (urlObj.password) {
+        urlObj.password = '***'
+      }
+      return urlObj.toString()
+    } catch {
+      // If URL parsing fails, just mask the middle part
+      const parts = url.split('@')
+      if (parts.length === 2) {
+        return parts[0].split(':')[0] + ':***@' + parts[1]
+      }
+      return url.replace(/:[^:@]+@/, ':***@')
+    }
+  }
+
+  /**
+   * Test database connection
+   */
+  async testConnection(): Promise<void> {
+    try {
+      await this.prisma.$connect()
+      await this.prisma.$queryRaw`SELECT 1`
+    } catch (error: any) {
+      const maskedUrl = this.maskDatabaseUrl(process.env.DATABASE_URL || '')
+      throw new Error(
+        `Failed to connect to database: ${error.message}. ` +
+          `Check your DATABASE_URL credentials: ${maskedUrl}`,
+      )
+    }
   }
 
   /**
