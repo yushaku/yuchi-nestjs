@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TerminusModule } from '@nestjs/terminus'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { ThrottlerStorageRedisService } from 'nestjs-throttler-storage-redis'
+import { WinstonModule } from 'nest-winston'
 
 import { AppController } from './app.controller'
 import { AuthModule } from './auth/auth.module'
@@ -11,6 +12,7 @@ import { UserModule } from './user/user.module'
 import { LearningModule } from './learning/learning.module'
 import { SubscriptionModule } from './subscription/subscription.module'
 import { SyncModule } from './sync/sync.module'
+import { WinstonConfigService } from './shared/logger.service'
 
 import Redis from 'ioredis'
 import Joi from 'joi'
@@ -34,7 +36,16 @@ import Joi from 'joi'
 
         THROTTLE_LIMIT: Joi.number().default(20),
         THROTTLE_TTL: Joi.number().default(60),
+
+        NODE_ENV: Joi.string()
+          .valid('development', 'production', 'test')
+          .default('development'),
       }),
+    }),
+    WinstonModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useClass: WinstonConfigService,
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
