@@ -13,42 +13,6 @@ export class SyncService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Upsert word progress (create or update)
-   * Converts timestamp (number) to Date for database storage
-   */
-  private async upsertProgress(
-    userId: string,
-    change: WordProgressSyncItemDto,
-  ): Promise<void> {
-    await this.prisma.userWordProgress.upsert({
-      where: {
-        userId_vocabId: {
-          userId,
-          vocabId: change.vocabId,
-        },
-      },
-      create: {
-        userId,
-        vocabId: change.vocabId,
-        reviewLevel: change.reviewLevel,
-        isIgnored: change.isIgnored,
-        lastReviewed: new Date(change.lastReviewed),
-        nextReview: new Date(change.nextReview),
-        correctCount: change.correctCount,
-        totalAttempts: change.totalAttempts,
-      },
-      update: {
-        reviewLevel: change.reviewLevel,
-        isIgnored: change.isIgnored,
-        lastReviewed: new Date(change.lastReviewed),
-        nextReview: new Date(change.nextReview),
-        correctCount: change.correctCount,
-        totalAttempts: change.totalAttempts,
-      },
-    })
-  }
-
-  /**
    * PUSH: Receive pending sync data from mobile app
    * Mobile app sends data from pending_sync_ids table
    */
@@ -58,38 +22,152 @@ export class SyncService {
   ): Promise<PushWordProgressResponseDto> {
     const syncedAt = Date.now()
 
-    // Extract all unique vocabIds
-    const vocabIds = [...new Set(dto.wordProgresses.map((wp) => wp.vocabId))]
+    // Step 1: Validate and filter valid vocabularies
+    const validWordProgresses = await this.filterValidWordProgresses(
+      dto.wordProgresses,
+    )
 
-    // Batch check all vocabIds in one query (avoid N+1 problem)
-    const validVocabs = await this.prisma.vocabulary.findMany({
-      where: {
-        id: { in: vocabIds },
-      },
-      select: { id: true },
+    if (validWordProgresses.length === 0) {
+      return {
+        success: true,
+        syncedCount: 0,
+        syncedAt,
+      }
+    }
+
+    // Step 2: Get existing progress records
+    const existingProgressMap = await this.getExistingProgressMap(
+      userId,
+      validWordProgresses,
+    )
+
+    // Step 3: Categorize records into creates and updates
+    const { toCreate, toUpdate } = this.categorizeProgressRecords(
+      validWordProgresses,
+      existingProgressMap,
+    )
+
+    // Step 4: Execute batch operations in transaction
+    await this.prisma.$transaction(async (tx) => {
+      // Batch create new records
+      if (toCreate.length > 0) {
+        await tx.userWordProgress.createMany({
+          data: toCreate.map((wp) => ({
+            userId,
+            vocabId: wp.vocabId,
+            reviewLevel: wp.reviewLevel,
+            isIgnored: wp.isIgnored,
+            lastReviewed: new Date(wp.lastReviewed),
+            nextReview: new Date(wp.nextReview),
+            correctCount: wp.correctCount,
+            totalAttempts: wp.totalAttempts,
+          })),
+          skipDuplicates: true,
+        })
+      }
+
+      // Batch update existing records
+      // Note: Prisma doesn't support updateMany with different data per row,
+      // so we use Promise.all for parallel updates within transaction
+      if (toUpdate.length > 0) {
+        await Promise.all(
+          toUpdate.map((wp) =>
+            tx.userWordProgress.update({
+              where: {
+                userId_vocabId: {
+                  userId,
+                  vocabId: wp.vocabId,
+                },
+              },
+              data: {
+                reviewLevel: wp.reviewLevel,
+                isIgnored: wp.isIgnored,
+                lastReviewed: new Date(wp.lastReviewed),
+                nextReview: new Date(wp.nextReview),
+                correctCount: wp.correctCount,
+                totalAttempts: wp.totalAttempts,
+              },
+            }),
+          ),
+        )
+      }
     })
-
-    // Create Set for O(1) lookup
-    const validVocabSet = new Set(validVocabs.map((v) => v.id))
-
-    // Filter and process only valid word progresses
-    const validWordProgresses = dto.wordProgresses.filter((wp) =>
-      validVocabSet.has(wp.vocabId),
-    )
-
-    // Batch upsert all valid progresses
-    // Use Promise.all for parallel execution (faster than sequential)
-    await Promise.all(
-      validWordProgresses.map((wordProgress) =>
-        this.upsertProgress(userId, wordProgress),
-      ),
-    )
 
     return {
       success: true,
       syncedCount: validWordProgresses.length,
       syncedAt,
     }
+  }
+
+  /**
+   * Validates vocabulary IDs and returns only valid word progresses
+   */
+  private async filterValidWordProgresses(
+    wordProgresses: WordProgressSyncItemDto[],
+  ): Promise<WordProgressSyncItemDto[]> {
+    const vocabIds = [...new Set(wordProgresses.map((wp) => wp.vocabId))]
+
+    const validVocabs = await this.prisma.vocabulary.findMany({
+      where: { id: { in: vocabIds } },
+      select: { id: true },
+    })
+
+    const validVocabSet = new Set(validVocabs.map((v) => v.id))
+
+    return wordProgresses.filter((wp) => validVocabSet.has(wp.vocabId))
+  }
+
+  /**
+   * Fetches existing progress records and returns as a Map for O(1) lookup
+   */
+  private async getExistingProgressMap(
+    userId: string,
+    wordProgresses: WordProgressSyncItemDto[],
+  ): Promise<Map<string, { vocabId: string; lastReviewed: Date }>> {
+    const vocabIds = wordProgresses.map((wp) => wp.vocabId)
+
+    const existingProgresses = await this.prisma.userWordProgress.findMany({
+      where: {
+        userId,
+        vocabId: { in: vocabIds },
+      },
+      select: {
+        vocabId: true,
+        lastReviewed: true,
+      },
+    })
+
+    return new Map(
+      existingProgresses.map((ep) => [ep.vocabId, ep]),
+    )
+  }
+
+  /**
+   * Separates word progresses into creates and updates based on existing records
+   * Only updates when new lastReviewed > existing lastReviewed
+   */
+  private categorizeProgressRecords(
+    wordProgresses: WordProgressSyncItemDto[],
+    existingProgressMap: Map<string, { vocabId: string; lastReviewed: Date }>,
+  ){
+    const toCreate: WordProgressSyncItemDto[] = []
+    const toUpdate: WordProgressSyncItemDto[] = []
+
+    for (const wordProgress of wordProgresses) {
+      const existing = existingProgressMap.get(wordProgress.vocabId)
+
+      if (!existing) {
+        toCreate.push(wordProgress)
+      } else if (
+        wordProgress.lastReviewed > existing.lastReviewed.getTime()
+      ) {
+        toUpdate.push(wordProgress)
+      }
+      // Skip if existing.lastReviewed >= new lastReviewed (no update needed)
+    }
+
+    return { toCreate, toUpdate }
   }
 
   /**
