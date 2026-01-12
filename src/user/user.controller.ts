@@ -30,6 +30,7 @@ import {
   UpdateUserRoleDto,
   UsersListResponseDto,
   UserResponseDto,
+  UserInfoWithSubscriptionDto,
   CreateUserDto,
 } from './dto/user.dto'
 
@@ -57,11 +58,11 @@ export class UserController {
 
   @Get('info')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get current user info' })
+  @ApiOperation({ summary: 'Get current user info with subscription status' })
   @ApiResponse({
     status: 200,
     description: 'User information retrieved successfully',
-    type: UserResponseDto,
+    type: UserInfoWithSubscriptionDto,
   })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   info(@JwtUser() { userId }: JwtDecoded) {
