@@ -7,8 +7,10 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston'
 
 import { AppModule } from './app.module'
+import { HttpLoggingInterceptor } from './shared/interceptor'
 
 async function bootstrap() {
   // fastify
@@ -20,6 +22,10 @@ async function bootstrap() {
     AppModule,
     adapter,
   )
+
+  // Use Winston logger
+  const logger = app.get(WINSTON_MODULE_NEST_PROVIDER)
+  app.useLogger(logger)
 
   const config = app.get(ConfigService)
 
@@ -63,6 +69,9 @@ async function bootstrap() {
   // Auto-validation with Zod
   app.useGlobalPipes(new ZodValidationPipe())
 
+  // HTTP Request Logging Interceptor
+  app.useGlobalInterceptors(new HttpLoggingInterceptor())
+
   // Swagger API Document
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Yuchi API')
@@ -87,12 +96,17 @@ async function bootstrap() {
   app.enableShutdownHooks()
 
   const APP_PORT = process.env.APP_PORT ?? 8000
-  console.log(`Listening for HTTP on http://localhost:${APP_PORT}`)
+  logger.log(`Listening for HTTP on http://localhost:${APP_PORT}`, 'Bootstrap')
   await app.listen(APP_PORT, '0.0.0.0')
 
-  const silentError = (err: any) => console.error(err)
-  process.on('unhandledRejection', silentError)
-  process.on('uncaughtException', silentError)
+  // Use Winston logger for error handling
+  process.on('unhandledRejection', (reason: any) => {
+    logger.error('Unhandled Rejection', reason, 'Bootstrap')
+  })
+  process.on('uncaughtException', (error: Error) => {
+    logger.error('Uncaught Exception', error.stack, 'Bootstrap')
+    process.exit(1)
+  })
 }
 
 bootstrap()
