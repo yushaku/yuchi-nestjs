@@ -1,0 +1,16 @@
+# Development Team Rules
+
+## Code Standards
+- Sử dụng TypeScript/JavaScript ES6+
+- Follow Airbnb Style Guide
+- Commit message theo Conventional Commits
+
+## Git Workflow
+- Branch naming: feature/*, bugfix/*, hotfix/*
+- PR phải có ít nhất 1 approval từ Lead
+- Code phải pass CI/CD trước khi merge
+
+## Testing Requirements
+- Unit test coverage tối thiểu 80%
+- Integration tests cho critical paths
+- E2E tests cho main user flows

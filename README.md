@@ -90,3 +90,41 @@ The project includes end-to-end tests using Jest and Supertest. The test configu
 - Automatically loads `.env.test` file
 - Database is cleaned before and after each test run
 - See `test/README.md` for more details
+
+## cursor
+
+### Cho Lead:
+- Review PRs trong vòng 24h
+- Document architectural decisions (ADR)
+- Weekly tech debt review
+- Maintain coding standards documentation
+
+### Cho Dev:
+- Commit frequently với meaningful messages
+- Write tests trước khi implement (TDD)
+- Refactor sau khi feature hoàn thành
+- Document complex logic
+
+### Cho QA:
+- Automate repetitive test cases
+- Maintain test documentation
+- Report bugs với đầy đủ thông tin
+- Update test cases khi requirements thay đổi
+
+
+### 7 bước rõ ràng:
+
+Lead trigger command (/design-system)
+Cursor hỏi để clarify requirements
+Lead trả lời từng phần
+Cursor validate understanding
+Lead confirm và trả lời clarifications
+Cursor đề xuất architecture chi tiết với:
+
+Component breakdown
+Tech choices với reasoning
+Trade-offs analysis
+Implementation phases
+Risk mitigation
+
+Lead feedback và Cursor iterate để adjust
