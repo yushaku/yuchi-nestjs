@@ -99,6 +99,32 @@ export class UserResponseDto {
   role: Role
 }
 
+export class UserInfoWithSubscriptionDto {
+  @ApiProperty({ description: 'User ID' })
+  id: string
+
+  @ApiProperty({ description: 'User email' })
+  email: string
+
+  @ApiPropertyOptional({ description: 'User name' })
+  name: string | null
+  @ApiPropertyOptional({
+    description: 'Current active subscription',
+    example: {
+      planType: 'MONTHLY',
+      status: 'ACTIVE',
+      startDate: '2024-01-01T00:00:00.000Z',
+      endDate: '2024-02-01T00:00:00.000Z',
+    },
+  })
+  subscription?: {
+    planType: string
+    status: string
+    startDate: Date
+    endDate: Date | null
+  } | null
+}
+
 export class UsersListResponseDto {
   @ApiProperty({ type: [UserResponseDto], description: 'List of users' })
   users: UserResponseDto[]

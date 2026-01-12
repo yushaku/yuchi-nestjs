@@ -10,9 +10,11 @@ import {
   UpdateUserRoleDto,
   UsersListResponseDto,
   UserResponseDto,
+  UserInfoWithSubscriptionDto,
   Role,
   CreateUserDto,
 } from './dto/user.dto'
+import { SubStatus } from '../../generated/prisma/client'
 import * as bcrypt from 'bcryptjs'
 
 @Injectable()
@@ -48,7 +50,7 @@ export class UserService {
     return user as UserResponseDto
   }
 
-  async userInfo(userId: string) {
+  async userInfo(userId: string){
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -58,10 +60,46 @@ export class UserService {
         role: true,
       },
     })
-    if (!user) {
-      throw new NotFoundException('User not found')
+    if (!user) throw new NotFoundException('User not found')
+
+    // Get current active subscription
+    const now = new Date()
+    const activeSubscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: SubStatus.ACTIVE,
+        OR: [
+          { endDate: null }, // Lifetime subscription
+          { endDate: { gt: now } }, // Subscription not expired yet
+        ],
+      },
+      orderBy: {
+        startDate: 'desc', 
+      },
+      select: {
+        id: true,
+        planType: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+      },
+    })
+
+    const result  = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      subscription: activeSubscription
+        ? {
+            planType: activeSubscription.planType,
+            status: activeSubscription.status,
+            startDate: activeSubscription.startDate,
+            endDate: activeSubscription.endDate,
+          }
+        : null,
     }
-    return user
+
+    return result
   }
 
   async searchUsers(dto: SearchUsersDto): Promise<UsersListResponseDto> {
