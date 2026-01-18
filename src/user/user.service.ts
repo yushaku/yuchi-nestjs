@@ -10,7 +10,6 @@ import {
   UpdateUserRoleDto,
   UsersListResponseDto,
   UserResponseDto,
-  UserInfoWithSubscriptionDto,
   Role,
   CreateUserDto,
 } from './dto/user.dto'
@@ -50,7 +49,7 @@ export class UserService {
     return user as UserResponseDto
   }
 
-  async userInfo(userId: string){
+  async userInfo(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -74,7 +73,7 @@ export class UserService {
         ],
       },
       orderBy: {
-        startDate: 'desc', 
+        startDate: 'desc',
       },
       select: {
         id: true,
@@ -85,7 +84,7 @@ export class UserService {
       },
     })
 
-    const result  = {
+    const result = {
       id: user.id,
       email: user.email,
       name: user.name,
@@ -178,5 +177,68 @@ export class UserService {
     })
 
     return updatedUser as UserResponseDto
+  }
+
+  /**
+   * Get user summary statistics for word progress
+   * Returns total, total_word_active, total_word_inactive, review_count, and statistics by proficiency
+   */
+  async getUserSummary(userId: string) {
+    // Get all user's word progress records for statistics
+    const allProgressRecords = await this.prisma.userWordProgress.findMany({
+      where: { userId },
+      select: {
+        reviewLevel: true,
+        isIgnored: true,
+        totalAttempts: true,
+        correctCount: true,
+      },
+    })
+
+    // Calculate totals
+    const total = allProgressRecords.length
+    const total_word_active = allProgressRecords.filter(
+      (p) => !p.isIgnored,
+    ).length
+    const total_word_inactive = allProgressRecords.filter(
+      (p) => p.isIgnored,
+    ).length
+    const review_count = allProgressRecords.filter(
+      (p) => p.totalAttempts > 0,
+    ).length
+
+    // Calculate statistics by proficiency level
+    // reviewLevel is the proficiency level
+    const proficiencyMap = new Map<number, number>()
+
+    // Initialize all proficiency levels 0-9 with count 0
+    for (let i = 0; i <= 9; i++) {
+      proficiencyMap.set(i, 0)
+    }
+
+    // Count words by proficiency level (reviewLevel is the proficiency)
+    allProgressRecords.forEach((record) => {
+      const proficiency = record.reviewLevel
+      proficiencyMap.set(
+        proficiency,
+        (proficiencyMap.get(proficiency) || 0) + 1,
+      )
+    })
+
+    // Convert to array format
+    const statistic = Array.from(proficiencyMap.entries())
+      .map(([proficiency, count]) => ({
+        proficiency,
+        count,
+      }))
+      .sort((a, b) => a.proficiency - b.proficiency)
+
+    return {
+      total,
+      total_word_active,
+      total_word_inactive,
+      review_count,
+      statistic,
+    }
   }
 }

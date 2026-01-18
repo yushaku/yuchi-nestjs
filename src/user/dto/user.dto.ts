@@ -141,3 +141,49 @@ export class UsersListResponseDto {
   @ApiProperty({ description: 'Total pages' })
   totalPages: number
 }
+
+export class ProficiencyStatisticDto {
+  @ApiProperty({
+    description: 'Proficiency level (0-9)',
+    example: 0,
+  })
+  proficiency: number
+
+  @ApiProperty({
+    description: 'Number of words at this proficiency level',
+    example: 20,
+  })
+  count: number
+}
+
+export class UserSummaryResponseDto {
+  @ApiProperty({
+    description: 'Total number of word progress records',
+    example: 551,
+  })
+  total: number
+
+  @ApiProperty({
+    description: 'Total number of active words (isIgnored = false)',
+    example: 541,
+  })
+  total_word_active: number
+
+  @ApiProperty({
+    description: 'Total number of inactive words (isIgnored = true)',
+    example: 10,
+  })
+  total_word_inactive: number
+
+  @ApiProperty({
+    description: 'Number of words that have been reviewed (totalAttempts > 0)',
+    example: 541,
+  })
+  review_count: number
+
+  @ApiProperty({
+    type: [ProficiencyStatisticDto],
+    description: 'Statistics by proficiency level (0-9)',
+  })
+  statistic: ProficiencyStatisticDto[]
+}

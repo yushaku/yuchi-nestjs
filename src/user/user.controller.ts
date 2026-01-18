@@ -18,7 +18,6 @@ import {
   ApiResponse,
   ApiBody,
   ApiParam,
-  ApiQuery,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
@@ -32,7 +31,12 @@ import {
   UserResponseDto,
   UserInfoWithSubscriptionDto,
   CreateUserDto,
+  UserSummaryResponseDto,
 } from './dto/user.dto'
+import { ResponseDTO } from '@/shared/dto/response.dto'
+import { ApiOkResponseDTO } from '@/shared/decorators'
+import { ThrottlerGuard } from '@nestjs/throttler'
+import { ApiTooManyRequestsResponse } from '@nestjs/swagger'
 
 @ApiBearerAuth()
 @Controller('users')
@@ -72,10 +76,6 @@ export class UserController {
   @Get()
   @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Search and list users (Admin only)' })
-  @ApiQuery({ name: 'query', required: false, description: 'Search query (email or name)' })
-  @ApiQuery({ name: 'role', required: false, enum: ['ADMIN', 'SALE', 'MEMBER'], description: 'Filter by role' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'perPage', required: false, type: Number, description: 'Items per page (default: 20)' })
   @ApiResponse({
     status: 200,
     description: 'Users retrieved successfully',
@@ -103,5 +103,27 @@ export class UserController {
   @ApiNotFoundResponse({ description: 'User not found' })
   updateUserRole(@Param('id') userId: string, @Body() dto: UpdateUserRoleDto) {
     return this.userService.updateUserRole(userId, dto)
+  }
+
+  @Get('summary')
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @ApiOperation({
+    summary: 'Get user word progress summary',
+    description:
+      'Returns comprehensive statistics about user word progress including total words, active/inactive counts, review count, and proficiency level distribution.',
+  })
+  @ApiOkResponseDTO({ data: UserSummaryResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Summary retrieved successfully',
+    type: UserSummaryResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
+  async getSummary(
+    @JwtUser() { userId }: JwtDecoded,
+  ): Promise<ResponseDTO<UserSummaryResponseDto>> {
+    const result = await this.userService.getUserSummary(userId)
+    return new ResponseDTO({ data: result })
   }
 }
