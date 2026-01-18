@@ -123,7 +123,9 @@ export class SyncService {
   private async getExistingProgressMap(
     userId: string,
     wordProgresses: WordProgressSyncItemDto[],
-  ): Promise<Map<string, { vocabId: string; lastReviewed: Date }>> {
+  ): Promise<
+    Map<string, { vocabId: string; lastReviewed: Date; reviewLevel: number }>
+  > {
     const vocabIds = wordProgresses.map((wp) => wp.vocabId)
 
     const existingProgresses = await this.prisma.userWordProgress.findMany({
@@ -134,6 +136,7 @@ export class SyncService {
       select: {
         vocabId: true,
         lastReviewed: true,
+        reviewLevel: true,
       },
     })
 
@@ -142,11 +145,16 @@ export class SyncService {
 
   /**
    * Separates word progresses into creates and updates based on existing records
-   * Only updates when new lastReviewed > existing lastReviewed
+   * Only updates when:
+   * - new lastReviewed > existing lastReviewed AND
+   * - new reviewLevel >= existing reviewLevel (prevent downgrading review level)
    */
   private categorizeProgressRecords(
     wordProgresses: WordProgressSyncItemDto[],
-    existingProgressMap: Map<string, { vocabId: string; lastReviewed: Date }>,
+    existingProgressMap: Map<
+      string,
+      { vocabId: string; lastReviewed: Date; reviewLevel: number }
+    >,
   ) {
     const toCreate: WordProgressSyncItemDto[] = []
     const toUpdate: WordProgressSyncItemDto[] = []
@@ -156,10 +164,15 @@ export class SyncService {
 
       if (!existing) {
         toCreate.push(wordProgress)
-      } else if (wordProgress.lastReviewed > existing.lastReviewed.getTime()) {
+      } else if (
+        wordProgress.lastReviewed > existing.lastReviewed.getTime() &&
+        wordProgress.reviewLevel >= existing.reviewLevel
+      ) {
         toUpdate.push(wordProgress)
       }
-      // Skip if existing.lastReviewed >= new lastReviewed (no update needed)
+      // Skip if:
+      // - existing.lastReviewed >= new lastReviewed (no update needed), OR
+      // - new reviewLevel < existing reviewLevel (prevent downgrading)
     }
 
     return { toCreate, toUpdate }
