@@ -202,6 +202,17 @@ export class SyncService {
     const skip = (page - 1) * limit
     const total = await this.prisma.userWordProgress.count({ where })
 
+    // Count words that are due for review (nextReview < current time)
+    const currentTime = new Date()
+    const dueForReviewCount = await this.prisma.userWordProgress.count({
+      where: {
+        ...where,
+        nextReview: {
+          lt: currentTime,
+        },
+      },
+    })
+
     // Get paginated data with vocabulary and quiz information
     const progressRecords = await this.prisma.userWordProgress.findMany({
       where,
@@ -276,6 +287,7 @@ export class SyncService {
       total,
       totalPages,
       hasMore,
+      dueForReviewCount,
     }
   }
 }

@@ -369,4 +369,11 @@ export class PullWordProgressResponseDto {
     example: true,
   })
   hasMore: boolean
+
+  @ApiProperty({
+    description:
+      'Count of words that are due for review (nextReview < current time)',
+    example: 15,
+  })
+  dueForReviewCount: number
 }
