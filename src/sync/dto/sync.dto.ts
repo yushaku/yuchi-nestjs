@@ -92,6 +92,34 @@ export class SyncWordProgressDto extends createZodDto(SyncWordProgressSchema) {
 }
 
 // Response DTOs
+export class QuizQuestionResponseDto {
+  @ApiProperty({ description: 'Question in Korean' })
+  question: string
+
+  @ApiProperty({
+    description: 'Question translation in Vietnamese',
+    nullable: true,
+    required: false,
+  })
+  question_translation?: string | null
+
+  @ApiProperty({
+    type: [String],
+    description: 'Array of answer options',
+  })
+  options: string[]
+
+  @ApiProperty({ description: 'Correct answer' })
+  correct_answer: string
+
+  @ApiProperty({
+    description: 'Explanation in Vietnamese',
+    nullable: true,
+    required: false,
+  })
+  explanation?: string | null
+}
+
 export class WordProgressResponseDto {
   @ApiProperty({ description: 'User ID' })
   userId: string
@@ -122,6 +150,44 @@ export class WordProgressResponseDto {
 
   @ApiProperty({ description: 'Total number of attempts' })
   totalAttempts: number
+
+  // Vocabulary data
+  @ApiProperty({ description: 'Korean word' })
+  korean: string
+
+  @ApiProperty({
+    description: 'Hanja characters',
+    nullable: true,
+    required: false,
+  })
+  hanja?: string | null
+
+  @ApiProperty({ description: 'Vietnamese translation' })
+  vietnamese: string
+
+  @ApiProperty({ description: 'Pronunciation' })
+  pronunciation: string
+
+  @ApiProperty({
+    description: 'Example sentence in Korean',
+    nullable: true,
+    required: false,
+  })
+  example?: string | null
+
+  @ApiProperty({
+    description: 'Example sentence translation in Vietnamese',
+    nullable: true,
+    required: false,
+  })
+  example_translation?: string | null
+
+  // Quiz data
+  @ApiProperty({
+    type: [QuizQuestionResponseDto],
+    description: 'Array of quiz questions',
+  })
+  quiz: QuizQuestionResponseDto[]
 }
 
 export class ConflictInfoDto {

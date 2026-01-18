@@ -5,7 +5,6 @@ import {
   ApiBearerAuth,
   ApiResponse,
   ApiBody,
-  ApiQuery,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
   ApiTooManyRequestsResponse,
@@ -21,6 +20,7 @@ import {
   PushWordProgressResponseDto,
   PullWordProgressDto,
   PullWordProgressResponseDto,
+  WordProgressResponseDto,
 } from './dto/sync.dto'
 
 @Controller('sync')
@@ -60,31 +60,11 @@ export class SyncController {
     description:
       'Returns word progress records updated after lastSyncTime. Supports pagination (50 records per page). Use lastSyncTime=null for first-time login to get all 5000 words.',
   })
-  @ApiQuery({
-    name: 'lastSyncTime',
-    required: false,
-    type: Number,
-    example: null,
-    description:
-      'Timestamp of last sync (Unix timestamp in milliseconds, null or 0 for full sync)',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    type: Number,
-    description: 'Page number (1-based, default: 1)',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Number of records per page (default: 50, max: 100)',
-  })
   @ApiOkResponseDTO({ data: PullWordProgressResponseDto })
   @ApiResponse({
     status: 200,
     description: 'Pull completed successfully',
-    type: PullWordProgressResponseDto,
+    type: WordProgressResponseDto,
   })
   @ApiBadRequestResponse({ description: 'Invalid query parameters' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })

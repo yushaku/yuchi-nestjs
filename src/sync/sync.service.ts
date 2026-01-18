@@ -5,7 +5,6 @@ import {
   PushWordProgressDto,
   PushWordProgressResponseDto,
   PullWordProgressDto,
-  PullWordProgressResponseDto,
 } from './dto/sync.dto'
 
 @Injectable()
@@ -138,9 +137,7 @@ export class SyncService {
       },
     })
 
-    return new Map(
-      existingProgresses.map((ep) => [ep.vocabId, ep]),
-    )
+    return new Map(existingProgresses.map((ep) => [ep.vocabId, ep]))
   }
 
   /**
@@ -150,7 +147,7 @@ export class SyncService {
   private categorizeProgressRecords(
     wordProgresses: WordProgressSyncItemDto[],
     existingProgressMap: Map<string, { vocabId: string; lastReviewed: Date }>,
-  ){
+  ) {
     const toCreate: WordProgressSyncItemDto[] = []
     const toUpdate: WordProgressSyncItemDto[] = []
 
@@ -159,9 +156,7 @@ export class SyncService {
 
       if (!existing) {
         toCreate.push(wordProgress)
-      } else if (
-        wordProgress.lastReviewed > existing.lastReviewed.getTime()
-      ) {
+      } else if (wordProgress.lastReviewed > existing.lastReviewed.getTime()) {
         toUpdate.push(wordProgress)
       }
       // Skip if existing.lastReviewed >= new lastReviewed (no update needed)
@@ -174,10 +169,7 @@ export class SyncService {
    * PULL: Get updated word progress data with pagination
    * Returns data updated after lastSyncTime (or all if lastSyncTime is null/0)
    */
-  async pullWordProgress(
-    userId: string,
-    dto: PullWordProgressDto,
-  ): Promise<PullWordProgressResponseDto> {
+  async pullWordProgress(userId: string, dto: PullWordProgressDto) {
     const { lastSyncTime, page = 1, limit = 50 } = dto
     const where: any = {
       userId,
@@ -197,7 +189,7 @@ export class SyncService {
     const skip = (page - 1) * limit
     const total = await this.prisma.userWordProgress.count({ where })
 
-    // Get paginated data
+    // Get paginated data with vocabulary and quiz information
     const progressRecords = await this.prisma.userWordProgress.findMany({
       where,
       select: {
@@ -209,6 +201,28 @@ export class SyncService {
         nextReview: true,
         correctCount: true,
         totalAttempts: true,
+        vocab: {
+          select: {
+            korean: true,
+            hanja: true,
+            vietnamese: true,
+            pronunciation: true,
+            example: true,
+            exampleTranslation: true,
+            quizQuestions: {
+              select: {
+                question: true,
+                questionTranslation: true,
+                options: true,
+                correctAnswer: true,
+                explanation: true,
+              },
+              orderBy: {
+                createdAt: 'asc',
+              },
+            },
+          },
+        },
       },
       orderBy: {
         lastReviewed: 'asc', // Order by lastReviewed to ensure consistent pagination
@@ -217,17 +231,27 @@ export class SyncService {
       take: limit,
     })
 
-    // Convert Date to timestamp (number) for response
-    const data = progressRecords.map((record) => ({
-      userId: record.userId,
-      vocabId: record.vocabId,
-      reviewLevel: record.reviewLevel,
-      isIgnored: record.isIgnored,
-      lastReviewed: record.lastReviewed.getTime(),
-      nextReview: record.nextReview.getTime(),
-      correctCount: record.correctCount,
-      totalAttempts: record.totalAttempts,
-    }))
+    // Transform to response format: flatten vocab fields and convert dates to timestamps
+    const data = progressRecords.map(
+      ({ vocab, lastReviewed, nextReview, ...record }) => ({
+        ...record,
+        lastReviewed: lastReviewed.getTime(),
+        nextReview: nextReview.getTime(),
+        korean: vocab.korean,
+        hanja: vocab.hanja,
+        vietnamese: vocab.vietnamese,
+        pronunciation: vocab.pronunciation,
+        example: vocab.example,
+        example_translation: vocab.exampleTranslation,
+        quiz: vocab.quizQuestions.map(
+          ({ questionTranslation, correctAnswer, ...q }) => ({
+            ...q,
+            question_translation: questionTranslation,
+            correct_answer: correctAnswer,
+          }),
+        ),
+      }),
+    )
 
     const totalPages = Math.ceil(total / limit)
     const hasMore = page < totalPages
