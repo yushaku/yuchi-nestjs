@@ -26,6 +26,8 @@ import {
 import { SubscriptionService } from './subscription.service'
 import { CreateSubscriptionCodeDto } from './dto/create-subscription-code.dto'
 import { ApplySubscriptionCodeDto } from './dto/apply-subscription-code.dto'
+import { CreateGooglePlaySubscriptionDto } from './dto/create-google-play-subscription.dto'
+import { CreateAppleSubscriptionDto } from './dto/create-apple-subscription.dto'
 import {
   SearchSubscriptionCodesDto,
   SubscriptionCodeResponseDto,
@@ -43,6 +45,72 @@ import { ThrottlerGuard } from '@nestjs/throttler'
 @UseGuards(ThrottlerGuard)
 export class SubscriptionController {
   constructor(private subscriptionService: SubscriptionService) {}
+
+  @Post('google-play')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Create subscription from Google Play purchase',
+  })
+  @ApiBody({ type: CreateGooglePlaySubscriptionDto })
+  @ApiResponse({
+    status: 201,
+    type: SubscriptionResponseDto,
+    description: 'Subscription created successfully',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid input data' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
+  async createGooglePlaySubscription(
+    @JwtUser() { userId }: JwtDecoded,
+    @Body() dto: CreateGooglePlaySubscriptionDto,
+  ) {
+    return this.subscriptionService.createGooglePlaySubscription(userId, {
+      planType: dto.planType,
+      purchaseToken: dto.purchaseToken,
+      subscriptionId: dto.subscriptionId,
+      orderId: dto.orderId ?? null,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      endDate:
+        dto.endDate === undefined
+          ? undefined
+          : dto.endDate === null
+            ? null
+            : new Date(dto.endDate),
+    })
+  }
+
+  @Post('apple')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Create subscription from Apple App Store purchase',
+  })
+  @ApiBody({ type: CreateAppleSubscriptionDto })
+  @ApiResponse({
+    status: 201,
+    type: SubscriptionResponseDto,
+    description: 'Subscription created successfully',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid input data' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiTooManyRequestsResponse({ description: 'Too many requests' })
+  async createAppleSubscription(
+    @JwtUser() { userId }: JwtDecoded,
+    @Body() dto: CreateAppleSubscriptionDto,
+  ) {
+    return this.subscriptionService.createAppleSubscription(userId, {
+      planType: dto.planType,
+      originalTransactionId: dto.originalTransactionId,
+      productId: dto.productId,
+      receiptData: dto.receiptData ?? null,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      endDate:
+        dto.endDate === undefined
+          ? undefined
+          : dto.endDate === null
+            ? null
+            : new Date(dto.endDate),
+    })
+  }
 
   @Post('apply')
   @UseGuards(JwtAuthGuard)

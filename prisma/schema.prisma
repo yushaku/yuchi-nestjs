@@ -34,6 +34,12 @@ enum CodeStatus {
   USED // Đã được sử dụng
 }
 
+enum SubscriptionSource {
+  CODE
+  GOOGLE_PLAY
+  APPLE
+}
+
 enum Role {
   ADMIN // Quản trị viên - toàn quyền
   SALE // Nhân viên bán hàng - có thể tạo và quản lý subscription code
@@ -172,18 +178,33 @@ model SubscriptionCode {
 }
 
 model Subscription {
-  id        String    @id @default(uuid())
+  id        String             @id @default(uuid())
   userId    String
   planType  PlanType
-  status    SubStatus @default(ACTIVE)
-  startDate DateTime  @default(now())
+  status    SubStatus          @default(ACTIVE)
+  source    SubscriptionSource @default(CODE)
+  startDate DateTime           @default(now())
   endDate   DateTime?
-  codeId    String?   @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  codeId    String?            @unique
+
+  // Google Play
+  googlePlayPurchaseToken  String?
+  googlePlaySubscriptionId String?
+  googlePlayOrderId        String?
+
+  // Apple App Store
+  appleOriginalTransactionId String?
+  appleProductId             String?
+  appleReceiptData           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User              @relation(fields: [userId], references: [id])
   code SubscriptionCode? @relation(fields: [codeId], references: [id])
 
   @@index([userId])
+  @@index([source])
+  @@index([googlePlayPurchaseToken])
+  @@index([appleOriginalTransactionId])
 }

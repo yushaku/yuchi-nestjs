@@ -5,6 +5,7 @@ import {
   PlanType,
   CodeStatus,
   SubStatus,
+  SubscriptionSource,
 } from '../../../generated/prisma/client'
 
 const PlanTypeEnum = z.enum(PlanType)
@@ -122,6 +123,9 @@ export class SubscriptionResponseDto {
   @ApiProperty({ enum: SubStatus, description: 'Subscription status' })
   status: SubStatus
 
+  @ApiProperty({ enum: SubscriptionSource, description: 'Payment source' })
+  source: SubscriptionSource
+
   @ApiProperty({ description: 'Start date' })
   startDate: Date
 
@@ -130,6 +134,21 @@ export class SubscriptionResponseDto {
 
   @ApiPropertyOptional({ description: 'Code ID used for this subscription' })
   codeId: string | null
+
+  @ApiPropertyOptional({ description: 'Google Play purchase token' })
+  googlePlayPurchaseToken?: string | null
+
+  @ApiPropertyOptional({ description: 'Google Play subscription product ID' })
+  googlePlaySubscriptionId?: string | null
+
+  @ApiPropertyOptional({ description: 'Google Play order ID' })
+  googlePlayOrderId?: string | null
+
+  @ApiPropertyOptional({ description: 'Apple original transaction id' })
+  appleOriginalTransactionId?: string | null
+
+  @ApiPropertyOptional({ description: 'Apple product id' })
+  appleProductId?: string | null
 
   @ApiProperty({ description: 'Created at' })
   createdAt: Date

@@ -14,7 +14,12 @@ import {
   SubscriptionCodesListResponseDto,
 } from './dto/subscription-code.dto'
 import { ApplySubscriptionCodeDto } from './dto/apply-subscription-code.dto'
-import { CodeStatus, PlanType, SubStatus } from '../../generated/prisma/client'
+import {
+  CodeStatus,
+  PlanType,
+  SubStatus,
+  SubscriptionSource,
+} from '../../generated/prisma/client'
 
 @Injectable()
 export class SubscriptionService implements OnModuleInit {
@@ -297,6 +302,23 @@ export class SubscriptionService implements OnModuleInit {
     }
   }
 
+  private async assertNoActiveSubscription(userId: string) {
+    const now = new Date()
+    const activeSubscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: SubStatus.ACTIVE,
+        OR: [{ endDate: null }, { endDate: { gt: now } }],
+      },
+    })
+
+    if (activeSubscription) {
+      throw new ConflictException(
+        'You already have an active subscription. Please wait until it expires before applying a new subscription.',
+      )
+    }
+  }
+
   /**
    * Apply/redeem a subscription code for a user
    */
@@ -316,23 +338,7 @@ export class SubscriptionService implements OnModuleInit {
       throw new BadRequestException('This subscription code has expired')
     }
 
-    // Check if user already has an active subscription that is still valid
-    const activeSubscription = await this.prisma.subscription.findFirst({
-      where: {
-        userId,
-        status: SubStatus.ACTIVE,
-        OR: [
-          { endDate: null }, // Lifetime subscription
-          { endDate: { gt: now } }, // Subscription not expired yet
-        ],
-      },
-    })
-
-    if (activeSubscription) {
-      throw new ConflictException(
-        'You already have an active subscription. Please wait until it expires before applying a new code.',
-      )
-    }
+    await this.assertNoActiveSubscription(userId)
 
     // Calculate end date based on plan type
     const startDate = new Date()
@@ -348,6 +354,7 @@ export class SubscriptionService implements OnModuleInit {
           startDate,
           endDate,
           codeId: code.id,
+          source: SubscriptionSource.CODE,
           status: SubStatus.ACTIVE,
         },
         include: {
@@ -369,5 +376,89 @@ export class SubscriptionService implements OnModuleInit {
     })
 
     return result
+  }
+
+  async createGooglePlaySubscription(
+    userId: string,
+    dto: {
+      planType: PlanType
+      purchaseToken: string
+      subscriptionId: string
+      orderId?: string | null
+      startDate?: Date
+      endDate?: Date | null
+    },
+  ) {
+    // Idempotency: if token already mapped, return existing subscription
+    const existing = await this.prisma.subscription.findFirst({
+      where: { googlePlayPurchaseToken: dto.purchaseToken },
+      include: { code: true },
+    })
+    if (existing) return existing
+
+    await this.assertNoActiveSubscription(userId)
+
+    const startDate = dto.startDate ?? new Date()
+    const endDate =
+      dto.endDate === undefined
+        ? this.calculateEndDate(dto.planType, startDate)
+        : dto.endDate
+
+    return this.prisma.subscription.create({
+      data: {
+        userId,
+        planType: dto.planType,
+        status: SubStatus.ACTIVE,
+        source: SubscriptionSource.GOOGLE_PLAY,
+        startDate,
+        endDate,
+        googlePlayPurchaseToken: dto.purchaseToken,
+        googlePlaySubscriptionId: dto.subscriptionId,
+        googlePlayOrderId: dto.orderId ?? null,
+      },
+      include: { code: true },
+    })
+  }
+
+  async createAppleSubscription(
+    userId: string,
+    dto: {
+      planType: PlanType
+      originalTransactionId: string
+      productId: string
+      receiptData?: string | null
+      startDate?: Date
+      endDate?: Date | null
+    },
+  ) {
+    // Idempotency: if originalTransactionId already mapped, return existing subscription
+    const existing = await this.prisma.subscription.findFirst({
+      where: { appleOriginalTransactionId: dto.originalTransactionId },
+      include: { code: true },
+    })
+    if (existing) return existing
+
+    await this.assertNoActiveSubscription(userId)
+
+    const startDate = dto.startDate ?? new Date()
+    const endDate =
+      dto.endDate === undefined
+        ? this.calculateEndDate(dto.planType, startDate)
+        : dto.endDate
+
+    return this.prisma.subscription.create({
+      data: {
+        userId,
+        planType: dto.planType,
+        status: SubStatus.ACTIVE,
+        source: SubscriptionSource.APPLE,
+        startDate,
+        endDate,
+        appleOriginalTransactionId: dto.originalTransactionId,
+        appleProductId: dto.productId,
+        appleReceiptData: dto.receiptData ?? null,
+      },
+      include: { code: true },
+    })
   }
 }
