@@ -2,8 +2,11 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common'
 import { PrismaService } from '@/shared/prisma.service'
+import { JwtDecoded } from '@/shared/decorators/JwtUser.decorator'
 import {
   LearningGroupDto,
   CategoryDto,
@@ -37,6 +40,31 @@ import {
 export class LearningService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Check if user has active subscription based on JWT subscriptionEndDate
+   * @param subscriptionEndDate Unix timestamp in milliseconds, or null
+   * @returns true if subscription is active, false otherwise
+   */
+  private validateSubscription(
+    subscriptionEndDate: number | null | undefined,
+  ): void {
+    // No subscription info in JWT means no active subscription
+    if (subscriptionEndDate === null || subscriptionEndDate === undefined) {
+      throw new ForbiddenException(
+        'Active subscription required to access this content',
+      )
+    }
+
+    // subscriptionEndDate is Unix timestamp in milliseconds
+    // Check if it's in the future (lifetime subscriptions use far future timestamp)
+    const now = Date.now()
+    if (subscriptionEndDate <= now) {
+      throw new ForbiddenException(
+        'Active subscription required to access this content',
+      )
+    }
+  }
+
   async getAllLearningGroups(): Promise<LearningGroupDto[]> {
     return this.prisma.learningGroup.findMany({
       select: {
@@ -55,6 +83,7 @@ export class LearningService {
             icon: true,
             order: true,
             topikLevel: true,
+            isNeedPremium: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -81,14 +110,84 @@ export class LearningService {
     })
   }
 
-  async getVocabByCategoryId(categoryId: string): Promise<VocabularyDto[]> {
+  async getVocabByCategoryId(
+    categoryId: string,
+    user?: JwtDecoded | null,
+  ): Promise<VocabularyDto[]> {
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      select: { id: true, isNeedPremium: true },
+    })
+
+    if (!category) {
+      throw new NotFoundException('Category not found')
+    }
+
+    // Free category: accessible to everyone
+    if (!category.isNeedPremium) {
+      return this.prisma.vocabulary.findMany({
+        where: { categoryId },
+        orderBy: { korean: 'asc' },
+      })
+    }
+
+    // Premium category: require login + active subscription (admin bypass)
+    if (!user) {
+      throw new UnauthorizedException(
+        'Authentication required for this category',
+      )
+    }
+
+    if (user.role === 'ADMIN') {
+      return this.prisma.vocabulary.findMany({
+        where: { categoryId },
+        orderBy: { korean: 'asc' },
+      })
+    }
+
+    this.validateSubscription(user.subscriptionEndDate)
+
     return this.prisma.vocabulary.findMany({
       where: { categoryId },
       orderBy: { korean: 'asc' },
     })
   }
 
-  async getQuizzesByVocabId(VocabularyId: string): Promise<QuizQuestionDto[]> {
+  async getQuizzesByVocabId(
+    VocabularyId: string,
+    user?: JwtDecoded | null,
+  ): Promise<QuizQuestionDto[]> {
+    const vocab = await this.prisma.vocabulary.findUnique({
+      where: { id: VocabularyId },
+      select: {
+        id: true,
+        category: {
+          select: {
+            id: true,
+            isNeedPremium: true,
+          },
+        },
+      },
+    })
+
+    if (!vocab) {
+      throw new NotFoundException('Vocabulary not found')
+    }
+
+    const isPremium = vocab.category?.isNeedPremium ?? false
+
+    if (isPremium) {
+      if (!user) {
+        throw new UnauthorizedException(
+          'Authentication required for this vocabulary',
+        )
+      }
+
+      if (user.role !== 'ADMIN') {
+        this.validateSubscription(user.subscriptionEndDate)
+      }
+    }
+
     return this.prisma.quizQuestion.findMany({
       where: { VocabularyId },
     })
@@ -244,6 +343,7 @@ export class LearningService {
             order: item.order ?? 0,
             topikLevel: item.topikLevel ?? null,
             groupId: item.groupId ?? null,
+            isNeedPremium: item.isNeedPremium ?? true,
           },
         }),
       ),
@@ -313,6 +413,9 @@ export class LearningService {
               topikLevel: item.topikLevel,
             }),
             ...(item.groupId !== undefined && { groupId: item.groupId }),
+            ...(item.isNeedPremium !== undefined && {
+              isNeedPremium: item.isNeedPremium,
+            }),
           },
         }),
       ),

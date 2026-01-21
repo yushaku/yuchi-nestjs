@@ -7,6 +7,12 @@ export class CategoryDto {
   @ApiProperty()
   name: string
 
+  @ApiProperty({
+    description: 'Whether this category requires a premium subscription',
+    default: true,
+  })
+  isNeedPremium: boolean
+
   @ApiProperty({ required: false, nullable: true })
   description?: string | null
 

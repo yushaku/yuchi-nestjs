@@ -8,17 +8,19 @@ const CreateCategoryItemSchema = z.object({
   icon: z.string().optional().nullable(),
   order: z.number().int().min(0).default(0),
   topikLevel: z.number().int().min(1).max(3).optional().nullable(),
-  groupId: z.string().uuid('Invalid UUID format').optional().nullable(),
+  groupId: z.uuid('Invalid UUID format').optional().nullable(),
+  isNeedPremium: z.boolean().default(true),
 })
 
 const UpdateCategoryItemSchema = z.object({
-  id: z.string().uuid('Invalid UUID format'),
+  id: z.uuid('Invalid UUID format'),
   name: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
   icon: z.string().optional().nullable(),
   order: z.number().int().min(0).optional(),
   topikLevel: z.number().int().min(1).max(3).optional().nullable(),
   groupId: z.string().uuid('Invalid UUID format').optional().nullable(),
+  isNeedPremium: z.boolean().optional(),
 })
 
 const BatchCreateCategorySchema = z.object({
@@ -63,6 +65,12 @@ export class CreateCategoryItemDto extends createZodDto(
 
   @ApiPropertyOptional({ description: 'Learning group ID', example: 'uuid' })
   groupId?: string | null
+
+  @ApiProperty({
+    description: 'Whether this category requires a premium subscription',
+    default: true,
+  })
+  isNeedPremium: boolean
 }
 
 export class UpdateCategoryItemDto extends createZodDto(
@@ -92,6 +100,11 @@ export class UpdateCategoryItemDto extends createZodDto(
 
   @ApiPropertyOptional({ description: 'Learning group ID' })
   groupId?: string | null
+
+  @ApiPropertyOptional({
+    description: 'Whether this category requires a premium subscription',
+  })
+  isNeedPremium?: boolean
 }
 
 export class BatchCreateCategoryDto extends createZodDto(

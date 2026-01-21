@@ -31,7 +31,8 @@ import {
 } from './dto/learning.dto'
 import { ResponseDTO } from '@/shared/dto/response.dto'
 import { ApiOkResponseDTO } from '@/shared/decorators'
-import { AdminGuard } from '@/shared/guard'
+import { AdminGuard, OptionalJwtAuthGuard } from '@/shared/guard'
+import { JwtUser, JwtDecoded } from '@/shared/decorators/JwtUser.decorator'
 import {
   BatchCreateLearningGroupDto,
   BatchUpdateLearningGroupDto,
@@ -96,10 +97,15 @@ export class LearningController {
     description: 'Vocabularies retrieved successfully',
   })
   @ApiNotFoundResponse({ description: 'Category not found' })
+  @UseGuards(OptionalJwtAuthGuard)
   async getVocabByCategoryId(
     @Param('categoryId') categoryId: string,
+    @JwtUser() user: JwtDecoded | null,
   ): Promise<ResponseDTO<VocabularyDto[]>> {
-    const vocab = await this.learningService.getVocabByCategoryId(categoryId)
+    const vocab = await this.learningService.getVocabByCategoryId(
+      categoryId,
+      user,
+    )
     return new ResponseDTO({ data: vocab })
   }
 
@@ -112,10 +118,15 @@ export class LearningController {
     description: 'Quiz questions retrieved successfully',
   })
   @ApiNotFoundResponse({ description: 'Vocabulary not found' })
+  @UseGuards(OptionalJwtAuthGuard)
   async getQuizzesByVocabId(
     @Param('vocabId') vocabId: string,
+    @JwtUser() user: JwtDecoded | null,
   ): Promise<ResponseDTO<QuizQuestionDto[]>> {
-    const quizzes = await this.learningService.getQuizzesByVocabId(vocabId)
+    const quizzes = await this.learningService.getQuizzesByVocabId(
+      vocabId,
+      user,
+    )
     return new ResponseDTO({ data: quizzes })
   }
 

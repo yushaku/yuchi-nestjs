@@ -78,17 +78,18 @@ model LearningGroup {
 }
 
 model Category {
-  id          String         @id @default(uuid())
-  name        String // "인사 (Chào hỏi)"
-  description String?
-  icon        String? // "👋"
-  order       Int            @default(0)
-  topikLevel  Int? // 1, 2, or 3 (references TOPIK_LEVEL enum in constant.ts)
-  group       LearningGroup? @relation(fields: [groupId], references: [id])
-  groupId     String?
-  words       Vocabulary[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id            String         @id @default(uuid())
+  name          String // "인사 (Chào hỏi)"
+  description   String?
+  icon          String? // "👋"
+  order         Int            @default(0)
+  topikLevel    Int? // 1, 2, or 3 (references TOPIK_LEVEL enum in constant.ts)
+  isNeedPremium Boolean        @default(true)
+  group         LearningGroup? @relation(fields: [groupId], references: [id])
+  groupId       String?
+  words         Vocabulary[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([topikLevel])
   @@index([groupId])
