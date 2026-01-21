@@ -5,6 +5,7 @@ import { OAuth2Client } from 'google-auth-library'
 import { JWTService } from '../shared/jwt.service'
 import { PrismaService } from '@/shared/prisma.service'
 import { AuthResponseDto } from './dto/auth.dto'
+import { SubStatus } from '../../generated/prisma/client'
 
 @Injectable()
 export class AuthService {
@@ -29,6 +30,41 @@ export class AuthService {
     this.googleClient = new OAuth2Client()
   }
 
+  /**
+   * Get active subscription end date for a user
+   * Returns Unix timestamp in milliseconds, or null if no active subscription
+   * For lifetime subscriptions (endDate is null), returns a far future timestamp
+   */
+  private async getSubscriptionEndDate(userId: string): Promise<number | null> {
+    const now = new Date()
+    const activeSubscription = await this.prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: SubStatus.ACTIVE,
+        OR: [{ endDate: null }, { endDate: { gt: now } }],
+      },
+      orderBy: {
+        startDate: 'desc',
+      },
+      select: {
+        endDate: true,
+      },
+    })
+
+    if (!activeSubscription) {
+      return null
+    }
+
+    // null endDate means lifetime subscription - use a far future timestamp
+    if (!activeSubscription.endDate) {
+      // Return year 2100 timestamp (far future)
+      return new Date('2100-01-01').getTime()
+    }
+
+    // Return Unix timestamp in milliseconds
+    return activeSubscription.endDate.getTime()
+  }
+
   async login(email: string, password: string): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -43,7 +79,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials')
     }
 
-    const tokens = this.jwt.genToken({ userId: user.id, role: user.role })
+    const subscriptionEndDate = await this.getSubscriptionEndDate(user.id)
+    const tokens = this.jwt.genToken({
+      userId: user.id,
+      role: user.role,
+      subscriptionEndDate,
+    })
 
     return {
       ...tokens,
@@ -78,7 +119,12 @@ export class AuthService {
       },
     })
 
-    const tokens = this.jwt.genToken({ userId: user.id, role: user.role })
+    const subscriptionEndDate = await this.getSubscriptionEndDate(user.id)
+    const tokens = this.jwt.genToken({
+      userId: user.id,
+      role: user.role,
+      subscriptionEndDate,
+    })
 
     return {
       ...tokens,
@@ -126,7 +172,12 @@ export class AuthService {
         })
       }
 
-      const tokens = this.jwt.genToken({ userId: user.id, role: user.role })
+      const subscriptionEndDate = await this.getSubscriptionEndDate(user.id)
+      const tokens = this.jwt.genToken({
+        userId: user.id,
+        role: user.role,
+        subscriptionEndDate,
+      })
 
       return {
         ...tokens,
@@ -143,10 +194,24 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string): Promise<{ access_token: string }> {
-    const newAccessToken = await this.jwt.refreshToken(refreshToken)
-    if (!newAccessToken) {
+    // Verify refresh token and get user info
+    const payload = await this.jwt.validateRefreshToken(refreshToken)
+    if (!payload) {
       throw new UnauthorizedException('Invalid refresh token')
     }
+
+    // Re-fetch subscription end date (it might have changed)
+    const subscriptionEndDate = await this.getSubscriptionEndDate(
+      payload.userId,
+    )
+
+    // Generate new access token with updated subscription info
+    const newAccessToken = this.jwt.createAccessToken({
+      userId: payload.userId,
+      role: payload.role,
+      subscriptionEndDate,
+    })
+
     return { access_token: newAccessToken }
   }
 }

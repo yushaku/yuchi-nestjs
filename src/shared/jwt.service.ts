@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt'
 type TokenPayload = {
   userId: string
   role: string
+  subscriptionEndDate?: number | null // Unix timestamp in milliseconds, null for lifetime subscriptions
 }
 
 export type Invitetoken = {
@@ -66,6 +67,17 @@ export class JWTService {
     }
   }
 
+  public async validateRefreshToken(refresh_token: string): Promise<TokenPayload | null> {
+    try {
+      const payload = await this.jwtService.verifyAsync(refresh_token, {
+        secret: this.REFRESH_SECRET,
+      })
+      return payload as TokenPayload
+    } catch (error) {
+      return null
+    }
+  }
+
   public async refreshToken(refresh_token: string) {
     const payload: TokenPayload = await this.jwtService.verifyAsync(
       refresh_token,
@@ -76,6 +88,7 @@ export class JWTService {
     return this.createAccessToken({
       userId: payload.userId,
       role: payload.role,
+      subscriptionEndDate: payload.subscriptionEndDate,
     })
   }
 

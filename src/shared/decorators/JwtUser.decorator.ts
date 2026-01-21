@@ -3,6 +3,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common'
 export type JwtDecoded = {
   userId: string
   role: string
+  subscriptionEndDate?: number | null // Unix timestamp in milliseconds, null for lifetime subscriptions
 }
 
 export const JwtUser = createParamDecorator(
