@@ -38,7 +38,7 @@ import {
 
 @Injectable()
 export class LearningService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Check if user has active subscription based on JWT subscriptionEndDate
@@ -103,10 +103,57 @@ export class LearningService {
     })
   }
 
-  async getCategoriesByGroupId(groupId: string): Promise<CategoryDto[]> {
-    return this.prisma.category.findMany({
+  async getCategoriesByGroupId(
+    groupId: string,
+    userId?: string,
+  ): Promise<CategoryDto[]> {
+    const categories = await this.prisma.category.findMany({
       where: { groupId },
       orderBy: { order: 'asc' },
+    })
+
+    if (!userId) {
+      return categories.map((c) => ({ ...c, isLearned: false }))
+    }
+
+    const learnedCategoryIds = await this.prisma.userCategoryProgress.findMany({
+      where: { userId, categoryId: { in: categories.map((c) => c.id) } },
+      select: { categoryId: true },
+    })
+    const learnedSet = new Set(learnedCategoryIds.map((r) => r.categoryId))
+
+    return categories.map((c) => ({
+      ...c,
+      isLearned: learnedSet.has(c.id),
+    }))
+  }
+
+  /** Count categories the user has learned (has UserCategoryProgress) app-wide */
+  async getLearnedCategoryCount(userId: string | undefined): Promise<number> {
+    if (!userId) return null
+    return this.prisma.userCategoryProgress.count({
+      where: { userId },
+    })
+  }
+
+  /** Mark category as completed for user (sets completedAt; creates record if needed) */
+  async markCategoryCompleted(
+    userId: string,
+    categoryId: string,
+  ): Promise<void> {
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      select: { id: true },
+    })
+    if (!category) {
+      throw new NotFoundException('Category not found')
+    }
+    await this.prisma.userCategoryProgress.upsert({
+      where: {
+        userId_categoryId: { userId, categoryId },
+      },
+      create: { userId, categoryId, completedAt: new Date() },
+      update: { completedAt: new Date() },
     })
   }
 

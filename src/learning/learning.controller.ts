@@ -31,7 +31,7 @@ import {
 } from './dto/learning.dto'
 import { ResponseDTO } from '@/shared/dto/response.dto'
 import { ApiOkResponseDTO } from '@/shared/decorators'
-import { AdminGuard, OptionalJwtAuthGuard } from '@/shared/guard'
+import { AdminGuard, JwtAuthGuard, OptionalJwtAuthGuard } from '@/shared/guard'
 import { JwtUser, JwtDecoded } from '@/shared/decorators/JwtUser.decorator'
 import {
   BatchCreateLearningGroupDto,
@@ -57,7 +57,7 @@ import {
 @Controller('learning')
 @ApiTags('learning')
 export class LearningController {
-  constructor(private learningService: LearningService) {}
+  constructor(private learningService: LearningService) { }
 
   @Get('groups')
   @ApiOperation({ summary: 'Get all learning groups' })
@@ -66,9 +66,18 @@ export class LearningController {
     status: 200,
     description: 'Learning groups retrieved successfully',
   })
-  async getAllLearningGroups(): Promise<ResponseDTO<LearningGroupDto[]>> {
+  @UseGuards(OptionalJwtAuthGuard)
+  async getAllLearningGroups(
+    @JwtUser() user: JwtDecoded | null,
+  ): Promise<ResponseDTO<LearningGroupDto[]>> {
     const groups = await this.learningService.getAllLearningGroups()
-    return new ResponseDTO({ data: groups })
+    const userLearnedCategoryCount =
+      await this.learningService.getLearnedCategoryCount(user?.userId)
+
+    return new ResponseDTO({
+      data: groups,
+      userLearnedCategoryCount,
+    })
   }
 
   @Get('groups/:groupId/categories')
@@ -80,12 +89,32 @@ export class LearningController {
     description: 'Categories retrieved successfully',
   })
   @ApiNotFoundResponse({ description: 'Learning group not found' })
+  @UseGuards(OptionalJwtAuthGuard)
   async getCategoriesByGroupId(
     @Param('groupId') groupId: string,
+    @JwtUser() user: JwtDecoded | null,
   ): Promise<ResponseDTO<CategoryDto[]>> {
-    const categories =
-      await this.learningService.getCategoriesByGroupId(groupId)
+    const categories = await this.learningService.getCategoriesByGroupId(
+      groupId,
+      user?.userId,
+    )
     return new ResponseDTO({ data: categories })
+  }
+
+  @Post('categories/:categoryId/complete')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark category as completed for current user' })
+  @ApiParam({ name: 'categoryId', description: 'Category ID' })
+  @ApiResponse({ status: 200, description: 'Category marked as completed' })
+  @ApiNotFoundResponse({ description: 'Category not found' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async markCategoryComplete(
+    @Param('categoryId') categoryId: string,
+    @JwtUser() { userId }: JwtDecoded,
+  ): Promise<ResponseDTO<{ completed: true }>> {
+    await this.learningService.markCategoryCompleted(userId, categoryId)
+    return new ResponseDTO({ data: { completed: true } })
   }
 
   @Get('categories/:categoryId/vocabularies')

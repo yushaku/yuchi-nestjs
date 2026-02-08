@@ -33,6 +33,14 @@ export class CategoryDto {
 
   @ApiProperty()
   updatedAt: Date
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Whether the current user has learned this category (when authenticated)',
+    default: false,
+  })
+  isLearned?: boolean
 }
 
 export class LearningGroupDto {

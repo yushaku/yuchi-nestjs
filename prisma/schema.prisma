@@ -47,13 +47,14 @@ enum Role {
 }
 
 model User {
-  id             String             @id @default(uuid())
-  email          String             @unique
-  name           String?
-  password       String
-  role           Role               @default(MEMBER) // Phân quyền: ADMIN, SALE, MEMBER
-  wordProgresses UserWordProgress[]
-  subscriptions  Subscription[]
+  id                 String                 @id @default(uuid())
+  email              String                 @unique
+  name               String?
+  password           String
+  role               Role                   @default(MEMBER) // Phân quyền: ADMIN, SALE, MEMBER
+  wordProgresses     UserWordProgress[]
+  categoryProgresses UserCategoryProgress[]
+  subscriptions      Subscription[]
 
   @@index([role]) // Index để query user theo role
 }
@@ -78,18 +79,19 @@ model LearningGroup {
 }
 
 model Category {
-  id            String         @id @default(uuid())
-  name          String // "인사 (Chào hỏi)"
-  description   String?
-  icon          String? // "👋"
-  order         Int            @default(0)
-  topikLevel    Int? // 1, 2, or 3 (references TOPIK_LEVEL enum in constant.ts)
-  isNeedPremium Boolean        @default(true)
-  group         LearningGroup? @relation(fields: [groupId], references: [id])
-  groupId       String?
-  words         Vocabulary[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id             String                 @id @default(uuid())
+  name           String // "인사 (Chào hỏi)"
+  description    String?
+  icon           String? // "👋"
+  order          Int                    @default(0)
+  topikLevel     Int? // 1, 2, or 3 (references TOPIK_LEVEL enum in constant.ts)
+  isNeedPremium  Boolean                @default(true)
+  group          LearningGroup?         @relation(fields: [groupId], references: [id])
+  groupId        String?
+  words          Vocabulary[]
+  userProgresses UserCategoryProgress[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   @@index([topikLevel])
   @@index([groupId])
@@ -154,6 +156,19 @@ model UserWordProgress {
   // KEY TỐI ƯU 2: Index cho truy vấn SRS
   // Giúp query: "Lấy những từ của user X cần ôn trước giờ Y" cực nhanh
   @@index([userId, nextReview])
+}
+
+model UserCategoryProgress {
+  userId      String
+  categoryId  String
+  startedAt   DateTime  @default(now()) // Lần đầu bắt đầu học category
+  completedAt DateTime? // Optional: đánh dấu hoàn thành
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, categoryId])
+  @@index([userId])
+  @@index([categoryId])
 }
 
 // ============================================

@@ -44,6 +44,12 @@ export class ResponseDTO<T> {
   @ApiProperty({ required: false })
   data?: T
 
+  @ApiProperty({
+    required: false,
+    description: 'Number of categories the user has learned (when authenticated)',
+  })
+  userLearnedCategoryCount?: number
+
   constructor(data: Partial<ResponseDTO<T>> = {}) {
     Object.assign(this, {
       ...data,
