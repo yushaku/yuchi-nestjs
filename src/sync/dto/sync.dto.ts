@@ -182,6 +182,13 @@ export class WordProgressResponseDto {
   })
   example_translation?: string | null
 
+  @ApiProperty({
+    description: 'URL hình ảnh mô tả',
+    nullable: true,
+    required: false,
+  })
+  image_url?: string | null
+
   // Quiz data
   @ApiProperty({
     type: [QuizQuestionResponseDto],

@@ -9,6 +9,7 @@ const CreateVocabularyItemSchema = z.object({
   pronunciation: z.string().min(1, 'Pronunciation is required'),
   example: z.string().optional().nullable(),
   exampleTranslation: z.string().optional().nullable(),
+  imageUrl: z.url().optional().nullable(),
   categoryId: z.string().uuid('Invalid UUID format'),
 })
 
@@ -20,6 +21,7 @@ const UpdateVocabularyItemSchema = z.object({
   pronunciation: z.string().min(1).optional(),
   example: z.string().optional().nullable(),
   exampleTranslation: z.string().optional().nullable(),
+  imageUrl: z.url().optional().nullable(),
   categoryId: z.string().uuid('Invalid UUID format').optional(),
 })
 
@@ -62,6 +64,9 @@ export class CreateVocabularyItemDto extends createZodDto(
   @ApiPropertyOptional({ description: 'Vietnamese translation of example' })
   exampleTranslation?: string | null
 
+  @ApiPropertyOptional({ description: 'URL hình ảnh mô tả' })
+  imageUrl?: string | null
+
   @ApiProperty({ description: 'Category ID', example: 'uuid' })
   categoryId: string
 }
@@ -89,6 +94,9 @@ export class UpdateVocabularyItemDto extends createZodDto(
 
   @ApiPropertyOptional({ description: 'Vietnamese translation of example' })
   exampleTranslation?: string | null
+
+  @ApiPropertyOptional({ description: 'URL hình ảnh mô tả' })
+  imageUrl?: string | null
 
   @ApiPropertyOptional({ description: 'Category ID' })
   categoryId?: string

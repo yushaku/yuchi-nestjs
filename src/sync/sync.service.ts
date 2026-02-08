@@ -233,6 +233,7 @@ export class SyncService {
             pronunciation: true,
             example: true,
             exampleTranslation: true,
+            imageUrl: true,
             quizQuestions: {
               select: {
                 question: true,
@@ -267,6 +268,7 @@ export class SyncService {
         pronunciation: vocab.pronunciation,
         example: vocab.example,
         example_translation: vocab.exampleTranslation,
+        image_url: vocab.imageUrl,
         quiz: vocab.quizQuestions.map(
           ({ questionTranslation, correctAnswer, ...q }) => ({
             ...q,

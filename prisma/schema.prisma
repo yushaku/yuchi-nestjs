@@ -103,6 +103,7 @@ model Vocabulary {
   pronunciation      String // "annyeonghaseyo"
   example            String? // Korean example sentence
   exampleTranslation String? // Vietnamese translation of example
+  imageUrl           String? // URL hình ảnh mô tả (optional)
   category           Category           @relation(fields: [categoryId], references: [id])
   categoryId         String
   quizQuestions      QuizQuestion[]

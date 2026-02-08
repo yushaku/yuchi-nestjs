@@ -83,6 +83,13 @@ export class VocabularyDto {
   @ApiProperty({ required: false, nullable: true })
   exampleTranslation?: string | null
 
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description: 'URL hình ảnh mô tả',
+  })
+  imageUrl?: string | null
+
   @ApiProperty()
   categoryId: string
 

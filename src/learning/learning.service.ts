@@ -487,6 +487,7 @@ export class LearningService {
             pronunciation: item.pronunciation,
             example: item.example ?? null,
             exampleTranslation: item.exampleTranslation ?? null,
+            imageUrl: item.imageUrl ?? null,
             categoryId: item.categoryId,
           },
         }),
@@ -559,6 +560,7 @@ export class LearningService {
             ...(item.exampleTranslation !== undefined && {
               exampleTranslation: item.exampleTranslation,
             }),
+            ...(item.imageUrl !== undefined && { imageUrl: item.imageUrl }),
             ...(item.categoryId !== undefined && {
               categoryId: item.categoryId,
             }),
