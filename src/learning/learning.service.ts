@@ -38,7 +38,7 @@ import {
 
 @Injectable()
 export class LearningService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Check if user has active subscription based on JWT subscriptionEndDate

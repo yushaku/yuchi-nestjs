@@ -46,7 +46,8 @@ export class ResponseDTO<T> {
 
   @ApiProperty({
     required: false,
-    description: 'Number of categories the user has learned (when authenticated)',
+    description:
+      'Number of categories the user has learned (when authenticated)',
   })
   userLearnedCategoryCount?: number
 

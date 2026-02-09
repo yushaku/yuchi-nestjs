@@ -160,7 +160,6 @@ describe('SyncController (e2e)', () => {
     })
   })
 
-
   describe('Integration: Push and Pull', () => {
     it('should push data and then pull it back', async () => {
       const now = Date.now()

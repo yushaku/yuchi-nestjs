@@ -57,7 +57,7 @@ import {
 @Controller('learning')
 @ApiTags('learning')
 export class LearningController {
-  constructor(private learningService: LearningService) { }
+  constructor(private learningService: LearningService) {}
 
   @Get('groups')
   @ApiOperation({ summary: 'Get all learning groups' })

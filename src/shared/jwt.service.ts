@@ -67,7 +67,9 @@ export class JWTService {
     }
   }
 
-  public async validateRefreshToken(refresh_token: string): Promise<TokenPayload | null> {
+  public async validateRefreshToken(
+    refresh_token: string,
+  ): Promise<TokenPayload | null> {
     try {
       const payload = await this.jwtService.verifyAsync(refresh_token, {
         secret: this.REFRESH_SECRET,
