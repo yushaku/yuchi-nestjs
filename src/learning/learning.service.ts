@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common'
 import { PrismaService } from '@/shared/prisma.service'
+import { RedisService } from '@/shared/redis.service'
 import { JwtDecoded } from '@/shared/decorators/JwtUser.decorator'
 import {
   LearningGroupDto,
@@ -38,7 +39,13 @@ import {
 
 @Injectable()
 export class LearningService {
-  constructor(private prisma: PrismaService) {}
+  private readonly groupsCacheKey = 'learning:groups:all'
+  private readonly groupsCacheTtlSeconds = 5 * 60 // 5 minutes
+
+  constructor(
+    private prisma: PrismaService,
+    private redisService: RedisService,
+  ) { }
 
   /**
    * Check if user has active subscription based on JWT subscriptionEndDate
@@ -66,7 +73,12 @@ export class LearningService {
   }
 
   async getAllLearningGroups(): Promise<LearningGroupDto[]> {
-    return this.prisma.learningGroup.findMany({
+    const cached = await this.redisService.getClient().get(this.groupsCacheKey)
+    if (cached) {
+      return JSON.parse(cached) as LearningGroupDto[]
+    }
+
+    const groups = await this.prisma.learningGroup.findMany({
       select: {
         id: true,
         name: true,
@@ -86,6 +98,11 @@ export class LearningService {
             isNeedPremium: true,
             createdAt: true,
             updatedAt: true,
+            _count: {
+              select: {
+                words: true,
+              },
+            },
           },
           orderBy: {
             order: 'asc',
@@ -101,6 +118,45 @@ export class LearningService {
         },
       ],
     })
+
+    const data = groups.map((group) => ({
+      ...group,
+      categories: group.categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        description: category.description,
+        icon: category.icon,
+        order: category.order,
+        topikLevel: category.topikLevel,
+        isNeedPremium: category.isNeedPremium,
+        createdAt: category.createdAt,
+        updatedAt: category.updatedAt,
+        wordsCount: category._count.words,
+      })),
+    }))
+
+    await this.redisService
+      .getClient()
+      .set(
+        this.groupsCacheKey,
+        JSON.stringify(data),
+        'EX',
+        this.groupsCacheTtlSeconds,
+      )
+
+    return data
+  }
+
+  private async clearLearningGroupsCache(): Promise<void> {
+    await this.redisService.getClient().del(this.groupsCacheKey)
+  }
+
+  private async clearLearningGroupsCacheSafe(): Promise<void> {
+    try {
+      await this.clearLearningGroupsCache()
+    } catch {
+      // Cache invalidation errors should not block write operations.
+    }
   }
 
   async getCategoriesByGroupId(
@@ -266,6 +322,7 @@ export class LearningService {
         }),
       ),
     )
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: created.length,
@@ -317,6 +374,7 @@ export class LearningService {
         }),
       ),
     )
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: updated.length,
@@ -345,6 +403,7 @@ export class LearningService {
     await this.prisma.learningGroup.deleteMany({
       where: { id: { in: dto.ids } },
     })
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: dto.ids.length,
@@ -395,6 +454,7 @@ export class LearningService {
         }),
       ),
     )
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: created.length,
@@ -467,6 +527,7 @@ export class LearningService {
         }),
       ),
     )
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: updated.length,
@@ -495,6 +556,7 @@ export class LearningService {
     await this.prisma.category.deleteMany({
       where: { id: { in: dto.ids } },
     })
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: dto.ids.length,
@@ -540,6 +602,7 @@ export class LearningService {
         }),
       ),
     )
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: created.length,
@@ -615,6 +678,7 @@ export class LearningService {
         }),
       ),
     )
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: updated.length,
@@ -643,6 +707,7 @@ export class LearningService {
     await this.prisma.vocabulary.deleteMany({
       where: { id: { in: dto.ids } },
     })
+    await this.clearLearningGroupsCacheSafe()
 
     return {
       count: dto.ids.length,

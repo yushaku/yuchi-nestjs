@@ -36,6 +36,13 @@ export class CategoryDto {
 
   @ApiProperty({
     required: false,
+    description: 'Total number of words in this category',
+    example: 42,
+  })
+  wordsCount?: number
+
+  @ApiProperty({
+    required: false,
     description:
       'Whether the current user has learned this category (when authenticated)',
     default: false,
